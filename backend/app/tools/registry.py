@@ -6,7 +6,7 @@ Execution belongs to the Executor, which is the single real entry point.
 
 from __future__ import annotations
 
-from typing import Any, Callable
+from typing import Any, Callable, Iterable
 
 from pydantic import BaseModel
 
@@ -84,6 +84,24 @@ class ToolRegistry:
 
     def names(self) -> list[str]:
         return sorted(self._tools)
+
+    def subset(self, names: Iterable[str]) -> "ToolRegistry":
+        """A registry holding only the named tools.
+
+        This is how a role is restricted: a Planner given this subset has no
+        write tool registered at all, so it cannot modify a file even if the
+        model asks for one. Restriction by capability, not by instruction.
+        """
+        wanted = list(names)
+        missing = [name for name in wanted if name not in self._tools]
+        if missing:
+            raise ToolNotFoundError(
+                "unknown tool(s) for this role: " + ", ".join(sorted(missing))
+            )
+        scoped = ToolRegistry()
+        for name in wanted:
+            scoped.register(self._tools[name])
+        return scoped
 
     def specs(self) -> list[ToolSpec]:
         return [self._tools[name].spec for name in self.names()]

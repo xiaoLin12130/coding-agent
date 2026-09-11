@@ -133,6 +133,131 @@ def _report(result, args: argparse.Namespace) -> int:
     return 0 if result.status == "completed" else 1
 
 
+def _cmd_roles(args: argparse.Namespace) -> int:
+    """Show the six roles and the tools each one may use."""
+    from .roles import DEFAULT_ROLES
+
+    if args.json:
+        print(
+            json.dumps(
+                [
+                    {
+                        "name": role.name,
+                        "purpose": role.purpose,
+                        "allowed_tools": role.allowed_tools,
+                        "max_steps": role.max_steps,
+                        "verdict": role.verdict_kind,
+                    }
+                    for role in DEFAULT_ROLES.values()
+                ],
+                indent=2,
+                ensure_ascii=False,
+            )
+        )
+        return 0
+    print(str(len(DEFAULT_ROLES)) + " role(s):")
+    for role in DEFAULT_ROLES.values():
+        print("  " + role.name.ljust(16) + role.purpose)
+        print("      tools: " + (", ".join(role.allowed_tools) or "(none)"))
+    return 0
+
+
+def _cmd_orchestrate(args: argparse.Namespace) -> int:
+    """Run the Planner -> Coder -> Reviewer collaboration."""
+    from .models import OrchestrationResult  # noqa: F401  (documentation)
+    from .orchestrator import AgentOrchestrator, OrchestrationLimits
+    from .roles import DEFAULT_ROLES
+
+    working_dir = Path(args.working_dir).resolve() if args.working_dir else Path.cwd()
+    store = StateStore()
+    context = ToolContext(working_dir=working_dir, store=store)
+    registry = build_default_registry(context)
+    sessions = SessionManager(args.sessions_dir, store=store)
+    builder = ContextBuilder(sessions.transcript, sessions.memory, sessions.store)
+    checkpoints = CheckpointStore(args.checkpoints_dir)
+
+    # A script may be one reply list shared by every role, or a mapping of
+    # role -> replies, which multi-call roles need to stay deterministic.
+    per_role: dict[str, list[str]] = {}
+    shared: list[str] = []
+    if args.script:
+        raw = json.loads(Path(args.script).read_text(encoding="utf-8"))
+        if isinstance(raw, dict) and "replies" not in raw:
+            per_role = {str(name): [str(x) for x in replies] for name, replies in raw.items()}
+        elif isinstance(raw, dict):
+            shared = list(raw.get("replies", []))
+        else:
+            shared = [str(x) for x in raw]
+
+    def make_model(role) -> ScriptedModel:
+        return ScriptedModel(
+            per_role.get(role.name, shared), final_message=args.final, name=role.name
+        )
+
+    model = ScriptedModel(shared, final_message=args.final)
+
+    limits = OrchestrationLimits(
+        max_rounds=args.max_rounds,
+        max_steps=args.max_steps_per_role,
+        timeout_ms=args.timeout_ms,
+        stall_threshold=args.stall_threshold,
+    )
+
+    def confirm(request) -> str:
+        if args.confirm:
+            return args.confirm
+        if isinstance(request, dict):
+            print("-" * 60)
+            for key in ("tool", "risk", "command", "cwd", "impact", "choices"):
+                if key in request:
+                    print(key.ljust(8) + ": " + str(request[key]))
+            print("-" * 60)
+        answer = input("1) reject  2) once  3) session  [1]: ").strip() or "1"
+        return {"1": "reject", "2": "once", "3": "session"}.get(answer, answer)
+
+    def on_event(event) -> None:
+        if not args.quiet:
+            print("  " + event.render()[:200])
+
+    orchestrator = AgentOrchestrator(
+        model if not per_role else None,
+        sessions,
+        context,
+        model_factory=make_model if per_role else None,
+        builder=builder,
+        limits=limits,
+        registry=registry,
+        on_event=on_event,
+        confirm=confirm if (args.confirm or not args.no_confirm) else None,
+        log_path=Path(args.log) if args.log else runs_dir() / "tool-calls.jsonl",
+    )
+
+    result = orchestrator.run(args.task, run_id=args.run_id)
+
+    if args.json:
+        print(json.dumps(result.model_dump(mode="json"), indent=2, ensure_ascii=False))
+        return 0 if result.ok else 1
+
+    print()
+    print("status    : " + result.status)
+    print("reason    : " + result.reason)
+    print("rounds    : " + str(result.round_count) + " of " + str(limits.max_rounds))
+    print("roles     : " + json.dumps(result.role_summary()))
+    print("tools     : " + str(result.tool_calls) + " (" + str(result.tool_failures) + " failed)")
+    for role, tools in result.tools_by_role().items():
+        if tools:
+            print("  " + role + ": " + ", ".join(sorted(set(tools))))
+    for index, record in enumerate(result.rounds, start=1):
+        verdict = record.verdict
+        issues = "; ".join(record.issues[:2])
+        print("round " + str(index) + ": reviewer -> " + verdict + (" (" + issues + ")" if issues else ""))
+    if result.plan:
+        print("plan      :")
+        for line in result.plan.splitlines()[:8]:
+            print("  " + line)
+    return 0 if result.ok else 1
+
+
 def _cmd_checkpoints(args: argparse.Namespace) -> int:
     store = CheckpointStore(args.checkpoints_dir)
     runs = store.runs()
@@ -195,6 +320,31 @@ def build_parser() -> argparse.ArgumentParser:
 
     checkpoints = sub.add_parser("checkpoints", help="list run checkpoints")
     checkpoints.set_defaults(func=_cmd_checkpoints)
+
+    roles = sub.add_parser("roles", help="show the runtime roles and their tools")
+    roles.set_defaults(func=_cmd_roles)
+
+    orchestrate = sub.add_parser(
+        "orchestrate", help="run the Planner -> Coder -> Reviewer collaboration"
+    )
+    orchestrate.add_argument("--task", required=True)
+    orchestrate.add_argument(
+        "--script",
+        default=None,
+        help='JSON of canned replies: {"replies": [...]} shared by every role, '
+        'or {"planner": [...], "coder": [...], ...} per role',
+    )
+    orchestrate.add_argument("--final", default="Done.")
+    orchestrate.add_argument("--run-id", default=None)
+    orchestrate.add_argument("--max-rounds", type=int, default=3)
+    orchestrate.add_argument("--stall-threshold", type=int, default=2)
+    orchestrate.add_argument("--max-steps-per-role", type=int, default=25)
+    orchestrate.add_argument("--timeout-ms", type=int, default=600_000)
+    orchestrate.add_argument("--confirm", default=None, choices=list(CHOICES))
+    orchestrate.add_argument(
+        "--no-confirm", action="store_true", help="never ask; refusals go back to the role"
+    )
+    orchestrate.set_defaults(func=_cmd_orchestrate)
 
     return parser
 

@@ -163,6 +163,123 @@ class Checkpoint(BaseModel):
     updated_at: datetime = Field(default_factory=utc_now)
 
 
+# ---------------------------------------------------------------------------
+# Multi-agent orchestration (M7)
+# ---------------------------------------------------------------------------
+
+RoleName = Literal[
+    "planner",
+    "coder",
+    "reviewer",
+    "memory_curator",
+    "state_keeper",
+    "safety_guard",
+]
+
+# The Reviewer's answer, and the SafetyGuard's.
+ReviewVerdict = Literal["approved", "needs_fix", "unknown"]
+SafetyVerdict = Literal["safe", "blocked", "unknown"]
+
+OrchestrationStatus = Literal[
+    "completed", "max_rounds", "timeout", "blocked", "stalled", "error"
+]
+
+
+class RoleSpec(BaseModel):
+    """One runtime role: what it may do, and what it is told to do."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: RoleName
+    purpose: str
+    system_prompt: str
+    # The tool names this role may use. Enforced by giving the role a registry
+    # holding only these, never by asking the model to behave.
+    allowed_tools: list[str] = Field(default_factory=list)
+    max_steps: int = Field(default=6, ge=1)
+    # Whether the role's final message is a structured verdict.
+    verdict_kind: Literal["review", "safety", "none"] = "none"
+
+
+class RoleRun(BaseModel):
+    """What one role invocation did."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    role: RoleName
+    round: int = 0
+    status: str = ""
+    message: str = ""
+    tool_calls: int = 0
+    tool_failures: int = 0
+    duration_ms: int = 0
+    verdict: str | None = None
+    issues: list[str] = Field(default_factory=list)
+    # Only the tool NAMES reach the orchestrator's record: argument values can
+    # carry secrets, and the transcript already holds what happened.
+    tools_used: list[str] = Field(default_factory=list)
+
+    def render(self) -> str:
+        head = self.role + " (round " + str(self.round) + "): " + self.status
+        if self.verdict:
+            head += " -> " + self.verdict
+        if self.issues:
+            head += " (" + str(len(self.issues)) + " issue(s))"
+        return head
+
+
+class RoundRecord(BaseModel):
+    """One Planner/Coder/Reviewer round."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    index: int
+    coder: RoleRun | None = None
+    reviewer: RoleRun | None = None
+    safety: RoleRun | None = None
+    verdict: ReviewVerdict = "unknown"
+    issues: list[str] = Field(default_factory=list)
+    duration_ms: int = 0
+
+
+class OrchestrationResult(BaseModel):
+    """The outcome of a multi-agent collaboration."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    run_id: str
+    task: str
+    status: OrchestrationStatus
+    reason: str = ""
+    plan: str = ""
+    rounds: list[RoundRecord] = Field(default_factory=list)
+    role_runs: list[RoleRun] = Field(default_factory=list)
+    round_count: int = 0
+    tool_calls: int = 0
+    tool_failures: int = 0
+    duration_ms: int = 0
+    final_message: str = ""
+    started_at: datetime = Field(default_factory=utc_now)
+    finished_at: datetime = Field(default_factory=utc_now)
+    events: list[AgentEvent] = Field(default_factory=list)
+
+    @property
+    def ok(self) -> bool:
+        return self.status == "completed"
+
+    def role_summary(self) -> dict[str, int]:
+        summary: dict[str, int] = {}
+        for run in self.role_runs:
+            summary[run.role] = summary.get(run.role, 0) + 1
+        return summary
+
+    def tools_by_role(self) -> dict[str, list[str]]:
+        result: dict[str, list[str]] = {}
+        for run in self.role_runs:
+            result.setdefault(run.role, []).extend(run.tools_used)
+        return result
+
+
 class ModelReply(BaseModel):
     """One model response, tagged with where it came from."""
 

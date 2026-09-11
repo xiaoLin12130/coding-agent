@@ -537,3 +537,90 @@ python -m app.recovery.cli browser --profile mock
 ## Not in M6
 
 Multi-agent orchestration (Planner/Coder/Reviewer/…) is M7.
+---
+
+# Runtime multi-agent (M7)
+
+`app/agents/roles.py` and `app/agents/orchestrator.py` run the collaboration
+`docs/runtime-agents.md` describes:
+
+```text
+Planner -> Coder -> Reviewer -> 修复?
+                                 |- yes -> Coder
+                                 '- no  -> done
+```
+
+with StateKeeper, MemoryCurator and SafetyGuard as supporting roles.
+
+## The six roles
+
+| Role | Job | Tools it may use |
+| --- | --- | --- |
+| Planner | understand the goal, split the work | `list_dir`, `read_file`, `search` |
+| Coder | implement, then run the tests | the above + `write_file`, `apply_patch`, `run_shell` |
+| Reviewer | verify code, tests and completion | `list_dir`, `read_file`, `search`, `run_shell` |
+| MemoryCurator | judge long-lived knowledge | `memory_propose` |
+| StateKeeper | record where the project stands | read tools + `update_project_state` |
+| SafetyGuard | check the plan for overreach | read tools only |
+
+**Boundaries are enforced by capability, not by instruction.** Each role is
+handed a registry containing only its allowed tools, so a Planner has no write
+tool registered at all: a prompt can be ignored, an absent tool cannot be
+called. A typo in a role's allowlist fails loudly instead of silently widening
+it.
+
+## The four hard constraints
+
+| Constraint | How it holds |
+| --- | --- |
+| no role bypasses the Executor | every role runs through an `AgentLoop`, so through the M4 SafetyLayer and the Executor; the roles themselves never touch a file, a shell or a tool |
+| no role writes shared state directly | Project State and Memory change only through `update_project_state` / `memory_propose`, which keep their validation and review |
+| no infinite loop | `max_rounds` on the collaboration, `max_steps` per role, a wall-clock budget, and the per-run loop guard |
+| no infinite agent conversation | repeating the same verdict **and** the same issues stalls the collaboration (`stall_threshold`) instead of spinning |
+
+## Verdicts
+
+The Reviewer and the SafetyGuard answer in a fixed shape:
+
+```text
+VERDICT: APPROVED | NEEDS_FIX      (reviewer)
+VERDICT: SAFE | BLOCKED            (safety guard)
+ISSUE: <one concrete problem>      (repeatable)
+NOTES: <one line>
+```
+
+An answer **without** a verdict is `unknown`, which is treated as a fix request
+for the Reviewer (assuming approval from unparseable text is how a broken
+review passes) and as "not blocked" for the SafetyGuard. A BLOCKED plan stops
+the collaboration before the Coder runs.
+
+## Routing roles to models
+
+`AgentOrchestrator(model_factory=...)` builds a model per role, so a deployment
+can put a stronger model behind the Reviewer. Tests use it to script each role
+separately.
+
+## Result
+
+`OrchestrationResult` carries the plan, every round's verdict and issues, every
+role run (status, tool names, duration), the collaboration's event stream and
+the tool totals. Every role's tool calls go to the same audit log
+(`runs/tool-calls.jsonl`) as a single-agent run, confirmations included.
+
+## CLI
+
+```bash
+cd backend
+
+python -m app.agents.cli roles
+python -m app.agents.cli orchestrate --task "fix add()" --script plan.json --confirm once
+```
+
+`--script` is either `{"replies": [...]}` shared by every role, or a per-role
+mapping `{"planner": [...], "coder": [...], ...}` — multi-call roles need the
+latter to stay deterministic.
+
+## Not in M7
+
+The web console (M8). `docs/runtime-agents.md` keeps all real execution behind
+the Executor, which the orchestrator respects: it holds no tools of its own.

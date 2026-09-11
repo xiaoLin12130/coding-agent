@@ -1,43 +1,43 @@
 {
-  "current_milestone": "M6",
+  "current_milestone": "M7",
   "current_task": null,
-  "goal": "M6 — Session Recovery: continue a task after a browser crash, a WebSocket disconnect, an expired login, a program restart or a context that reached its threshold.",
-  "milestone_status": "M6 complete, M7 not started",
+  "goal": "M7 — Runtime Multi-Agent: Planner, Coder, Reviewer, MemoryCurator, StateKeeper and SafetyGuard under an AgentOrchestrator, completing a coding task collaboratively within bounded rounds, steps and time, without bypassing the Executor or writing shared state directly.",
+  "milestone_status": "M7 complete, M8 not started",
   "todos": [
     {
-      "content": "M6: context thresholds (soft/hard ratios) + pressure policy",
+      "content": "M7: RoleSpec + the six roles with capability-scoped tool allowlists",
       "status": "completed"
     },
     {
-      "content": "M6: soft-threshold compaction (carry fewer recent turns, keep the session)",
+      "content": "M7: ToolRegistry.subset so a role's tools are enforced by capability",
       "status": "completed"
     },
     {
-      "content": "M6: hard-threshold sequence (save state -> summarise -> archive -> reseed -> continue) with injections verified",
+      "content": "M7: review/safety verdict parsing (unknown is never approval)",
       "status": "completed"
     },
     {
-      "content": "M6: Project State / Memory / Recent Transcript / task injection into the new session",
+      "content": "M7: AgentOrchestrator (Planner -> SafetyGuard -> Coder/Reviewer rounds -> StateKeeper + MemoryCurator)",
       "status": "completed"
     },
     {
-      "content": "M6: RunRecovery (program restart from checkpoint, plan/pending/resume)",
+      "content": "M7: bounds — max_rounds, per-role max_steps, wall-clock timeout, stall detection",
       "status": "completed"
     },
     {
-      "content": "M6: BrowserRecovery (crash restart, manual login recovery, bounded retry)",
+      "content": "M7: per-role model routing (model_factory) + role-tagged events",
       "status": "completed"
     },
     {
-      "content": "M6: reconnect snapshot + read-only REST surface",
+      "content": "M7: role tool calls written to the shared audit log",
       "status": "completed"
     },
     {
-      "content": "M6: AgentLoop integration + app.recovery.cli",
+      "content": "M7: app.agents.cli roles/orchestrate",
       "status": "completed"
     },
     {
-      "content": "M6: tests incl. all five acceptance scenarios on the real components",
+      "content": "M7: tests incl. the four hard constraints and a collaborative acceptance run",
       "status": "completed"
     }
   ],
@@ -164,6 +164,16 @@
     "backend/tests/test_recovery_acceptance.py",
     "backend/tests/test_agent_llm.py",
     "backend/tests/test_agent_loop.py",
+    "backend/README.md",
+    "backend/app/agents/roles.py",
+    "backend/app/agents/orchestrator.py",
+    "backend/app/agents/models.py",
+    "backend/app/agents/cli.py",
+    "backend/app/agents/__init__.py",
+    "backend/app/tools/registry.py",
+    "backend/tests/test_agent_roles.py",
+    "backend/tests/test_agent_orchestrator.py",
+    "backend/tests/test_agent_orchestrator_cli.py",
     "backend/README.md"
   ],
   "tests": [
@@ -210,15 +220,21 @@
       "date": "2026-09-11"
     },
     {
-      "name": "backend pytest (M0..M6)",
-      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
-      "result": "632 passed in 215.6s (M6 added 74: thresholds 12, session 11, run 8, browser 17, api 9, cli 7, acceptance 8, plus 2 new loop/llm tests)",
-      "date": "2026-09-11"
-    },
-    {
       "name": "M6 acceptance run (real process, outside pytest)",
       "command": "agents.cli run (stopped at its step budget) -> recovery.cli status -> recovery.cli resume",
       "result": "PASS: the stopped run left a checkpoint; status reported it resumable at step 1; resume reported found checkpoint / restored session (recovered) / continued (completed); the file changed value = 1 -> value = 2 and the transcript is continuous across the restart (user, read_file, tool result, write_file, tool result, final answer)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M7)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "691 passed in 216.9s (M7 added 58: test_agent_roles 27, test_agent_orchestrator 25, test_agent_orchestrator_cli 6)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M7 acceptance run (real process, outside pytest)",
+      "command": "python -m app.agents.cli orchestrate --task 'add(2,3) returns -1; fix it and verify' --script plan.json --confirm once",
+      "result": "PASS: status=completed in 1 round of 3; all six roles ran (planner, safety_guard, coder, reviewer, state_keeper, memory_curator); 5 tool calls, 0 failed; the coder used read_file + apply_patch + run_shell and the check reported '1 passed'; the file changed to 'return a + b'; project state recorded current_task and files_changed; the memory curator's proposal was stored through the review pipeline; the audit log holds all five calls with run_shell confirmed=true",
       "date": "2026-09-11"
     }
   ],
@@ -274,7 +290,14 @@
     "BrowserModel now accepts provider_factory. Recovery replaces the page, so a model holding the old provider kept talking to a dead one (found by the M6 browser-crash acceptance test); the factory form is what lets the loop follow the restarted page.",
     "The AgentLoop gained restore_model_state (default True). A real model is stateless, so the stored snapshot is only a hint for a deterministic one; a caller supplying a fresh model (a new --script, or a rebuilt page) sets it False, otherwise the checkpoint silently rewinds the new model past its first reply (found in the CLI acceptance run).",
     "The recovery REST surface is read-only; a reconnecting client re-reads facts rather than the server keeping them in memory. FastAPI's legacy '= Query(gt=...)' form does not validate, so the pressure endpoint uses Annotated and maps an inverted threshold pair to 422 rather than a 500.",
-    "M6 did not implement multi-agent orchestration (M7), and did not automate credentials: login recovery only waits for the human, per the project's standing rule."
+    "M6 did not implement multi-agent orchestration (M7), and did not automate credentials: login recovery only waits for the human, per the project's standing rule.",
+    "M7 enforces role boundaries by CAPABILITY: each role gets a registry holding only its allowed tools (ToolRegistry.subset), so a Planner has no write tool registered. A prompt can be ignored; an absent tool cannot be called. An unknown name in an allowlist raises instead of silently widening it.",
+    "The roles share one session and one Project State / Memory, per docs/runtime-agents.md ('roles share Project State, Memory, current task, necessary context'). Each role's isolation comes from its system prompt and its tool registry, not from a separate transcript — which also lets the Reviewer see what the Coder actually did.",
+    "Verdicts are parsed from a fixed shape; an answer without a verdict is 'unknown', treated as a fix request for the Reviewer and as not-blocked for the SafetyGuard. Assuming approval from unparseable text is how a broken review silently passes.",
+    "M7 bounds the collaboration four ways: max_rounds, each role's own max_steps, a wall-clock budget checked before each round, and stall detection (the same verdict AND the same issues twice stops the run). The orchestrator takes an injectable clock so the time bound is provable in a test without waiting.",
+    "AgentOrchestrator accepts model_factory so a deployment can route roles to different models (a stronger reviewer), and so tests can script each role separately; a single shared reply queue is unusable for roles that make several model calls per run (found while writing the CLI acceptance).",
+    "Role tool calls are written to the same runs/tool-calls.jsonl audit log as single-agent runs (found in the acceptance run: role Executors had no log path, so multi-agent work went unaudited). Confirmations are recorded there too.",
+    "The orchestrator collects the roles' events into OrchestrationResult; without them the result showed that a role failed but not why (found by a test)."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -295,9 +318,12 @@
     "The browser integration test verifies wiring, not answer quality: the offline fixture is an echo server, so its reply is the prompt it received (which contains JSON examples). Content behaviour is covered by the scripted and acceptance tests.",
     "M6 is complete: backend/app/recovery/{models,thresholds,session_recovery,run_recovery,browser_recovery,snapshot,cli}.py plus the read-only /api/recovery routes and the AgentLoop integration; 632 backend tests green.",
     "The five M6 acceptance scenarios are covered by real components: program restart (CLI + tests), context threshold (rotation and soft compaction), WebSocket disconnect (snapshot re-sync), browser crash (a real page killed mid-run and restarted), login expiry (a real login wall plus a simulated manual sign-in).",
-    "Recovery is bounded everywhere: a restart budget, a login timeout, one retry per call and a bounded parse retry. Nothing retries forever."
+    "Recovery is bounded everywhere: a restart budget, a login timeout, one retry per call and a bounded parse retry. Nothing retries forever.",
+    "M7 is complete: backend/app/agents/{roles,orchestrator}.py plus the models/CLI/registry additions; 691 backend tests green.",
+    "docs/runtime-agents.md's four hard constraints are each covered by tests: no Executor bypass (roles hold no tools, and the role registry is the only way in), no direct shared-state writes (only the two tools change state), no infinite loop (round/step/time bounds), no infinite conversation (stall detection).",
+    "The roles add no new execution path: they are AgentLoops with restricted registries and role-specific prompts, so M4 safety and M3 parsing apply unchanged inside a collaboration."
   ],
-  "checkpoint": "M6 checkpoint 2026-09-11: recovery layer complete (context soft/hard thresholds with verified seed injections, checkpoint-based restart, browser crash restart with manual login recovery, reconnect snapshot and a read-only REST surface, wired into the agent loop), all five acceptance scenarios verified on the real components, 632 backend tests green. Next milestone: M7 (Runtime Multi-Agent).",
+  "checkpoint": "M7 checkpoint 2026-09-11: runtime multi-agent complete (six capability-scoped roles under a bounded orchestrator, verdict-driven Planner -> Coder -> Reviewer loop with stall detection, per-role model routing, shared audit log), collaborative acceptance verified in a real process, 691 backend tests green. Next milestone: M8 (Frontend Workbench).",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",
