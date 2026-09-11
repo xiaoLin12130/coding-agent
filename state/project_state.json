@@ -79,6 +79,12 @@
       "command": "pytest tests/test_web_chat_provider.py / tests/test_cli.py",
       "result": "PASS: stuck stream -> timed_out=True with partial text and exit code 2; never-starting generation -> start timeout; login wall -> LoginRequiredError, send refused, manual login detected by recover_session",
       "date": "2026-09-11"
+    },
+    {
+      "name": "git push verification",
+      "command": "git ls-remote origin",
+      "result": "refs/heads/main = 48e53a0913679252cb54c5e1a9fc80eec3c70b77, identical to local HEAD; repo URL returns HTTP 200",
+      "date": "2026-09-11"
     }
   ],
   "failures": [],
@@ -95,12 +101,15 @@
     "Subagent delegation was broken in this environment: children inherit the parent agent's create-time route (agent.options), not its live model route, so after a mid-session default-model switch every delegation hit the stale opencode-go provider and failed with 400 MissingSessionID (missing x-opencode-session). Root cause proven from the child session logs and fixed by pinning config.agentOptions (provider commandcode / model deepseek/deepseek-v4.1-flash) on the tool-subagent and tool-subagent-fork rows of the liangshen agent preset; the pin needs a DSH restart or a new session to mount, and the workflow tool passing an explicit provider/model works as an immediate workaround (verified)."
   ],
   "notes": [
-    "git init was run by the user on 2026-09-11 (branch master, no commits yet); the M0+M1 working tree is still uncommitted, so the AGENTS.md 'reviewer then commit' step has not been performed.",
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
     "Image inspection is unavailable to this model, so the screenshot was validated structurally (PNG magic bytes, 1440x900 IHDR, IDAT present) rather than visually.",
-    "Subagent route fix (2026-09-11): ~/.dsh/.agent-presets/liangshen/agent.cordis.yml edited (backup kept next to it) to pin the child agent route; takes effect on the next session/DSH restart, so delegation from the already-running session still uses the stale route."
+    "Subagent route fix (2026-09-11): ~/.dsh/.agent-presets/liangshen/agent.cordis.yml edited (backup kept next to it) to pin the child agent route; takes effect on the next session/DSH restart, so delegation from the already-running session still uses the stale route.",
+    "Git: repository initialised by the user (branch main, remote origin https://github.com/xiaoLin12130/coding-agent.git). The M0+M1 work is committed as 48e53a0913679252cb54c5e1a9fc80eec3c70b77 and pushed to origin/main on 2026-09-11 (90 files). The AGENTS.md reviewer step was not performed before this initial commit.",
+    "A stray empty clone of the same repository sits at ./coding-agent/ (only a .git directory, no commits, no files, no stashes). It is untracked and makes 'git add -A' fail with \"'coding-agent/' does not have a commit checked out\"; it was deliberately excluded from the commit instead of being deleted."
   ],
   "checkpoint": "M1 checkpoint 2026-09-11: browser layer complete (BrowserDriver + ProviderAdapter + WebChatProvider + profiles + artifacts + CLI), 57 backend tests green, full acceptance path verified end-to-end outside pytest against the offline fixture (open -> send -> wait -> capture -> screenshot -> DOM). Next milestone: M2 (State and Context).",
-  "git_branch": "master",
-  "cwd": "H:\\AI-game\\coding-agent"
+  "git_branch": "main",
+  "cwd": "H:\\AI-game\\coding-agent",
+  "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",
+  "git_head": "48e53a0913679252cb54c5e1a9fc80eec3c70b77"
 }

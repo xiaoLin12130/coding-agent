@@ -23,6 +23,12 @@
       "value": "The backend suite is 'cd backend && ../.venv/Scripts/python.exe -m pytest' (57 tests, ~64s). It launches a real headed Chromium for the browser tests, and pytest's summary line only appears when output is redirected to a file rather than piped to grep.",
       "source": "M1 setup",
       "updated_at": "2026-09-11"
+    },
+    {
+      "key": "repo.remote",
+      "value": "The project is tracked at https://github.com/xiaoLin12130/coding-agent.git on branch main. Push with 'git push origin main' (Windows git 2.54 with Git Credential Manager 2.7.3, stored account xiaoLin12130). A stray empty clone of this same repo exists at ./coding-agent/ - it is untracked and breaks 'git add -A'; prefer explicit paths or delete that directory.",
+      "source": "initial push",
+      "updated_at": "2026-09-11"
     }
   ]
 }
