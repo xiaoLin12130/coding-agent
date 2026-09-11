@@ -1,0 +1,106 @@
+{
+  "current_milestone": "M1",
+  "current_task": null,
+  "goal": "M1 — Browser Driver: minimal Playwright capability to drive a web LLM page (headed browser, persistent profile, open/input/send/completion detection/reply capture/screenshot/DOM snapshot) behind a ProviderAdapter, with exactly one provider implementation.",
+  "milestone_status": "M1 complete, M2 not started",
+  "todos": [
+    {
+      "content": "BrowserDriver: headed Playwright persistent context, navigation, screenshot, DOM snapshot, network capture",
+      "status": "completed"
+    },
+    {
+      "content": "ProviderAdapter contract (open/send/wait_until_complete/capture_response/is_logged_in/recover_session)",
+      "status": "completed"
+    },
+    {
+      "content": "Single provider: selector-driven WebChatProvider + JSON provider profiles",
+      "status": "completed"
+    },
+    {
+      "content": "Artifact store: per-run screenshot/DOM/timeline/reply/network files under runs/",
+      "status": "completed"
+    },
+    {
+      "content": "Offline fixture chat page (SSE streaming, stop control, login wall) for deterministic verification",
+      "status": "completed"
+    },
+    {
+      "content": "Tests: driver, provider (acceptance/timeout/login/capture priority), profiles, CLI",
+      "status": "completed"
+    },
+    {
+      "content": "Manual CLI acceptance run: open -> send -> wait -> capture -> screenshot -> DOM",
+      "status": "completed"
+    }
+  ],
+  "files_changed": [
+    "backend/app/browser/__init__.py",
+    "backend/app/browser/cli.py",
+    "backend/app/browser/artifacts.py",
+    "backend/app/browser/driver.py",
+    "backend/app/browser/errors.py",
+    "backend/app/browser/models.py",
+    "backend/app/browser/profiles.py",
+    "backend/app/browser/provider.py",
+    "backend/app/browser/web_chat.py",
+    "backend/profiles/mock.json",
+    "backend/profiles/example-web-llm.json",
+    "backend/fixtures/__init__.py",
+    "backend/fixtures/chat_site/__init__.py",
+    "backend/fixtures/chat_site/index.html",
+    "backend/fixtures/chat_site/server.py",
+    "backend/tests/conftest.py",
+    "backend/tests/test_browser_driver.py",
+    "backend/tests/test_web_chat_provider.py",
+    "backend/tests/test_profiles.py",
+    "backend/tests/test_cli.py",
+    "backend/app/config.py",
+    "backend/requirements.txt",
+    "backend/README.md",
+    ".gitignore",
+    "state/project_state.json",
+    "state/memory.json"
+  ],
+  "tests": [
+    {
+      "name": "backend pytest (M0 + M1)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "57 passed in 63.6s (test_api 6, test_ws 7, test_storage 7, test_profiles 12, test_browser_driver 8, test_web_chat_provider 12, test_cli 5); browser tests launch a real headed Chromium",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M1 acceptance run (manual CLI, outside pytest)",
+      "command": "python -m fixtures.chat_site.server --port 8765; python -m app.browser.cli ask --profile mock --prompt 'M1 acceptance run'",
+      "result": "exit 0; source=network (SSE captured), completed=True, timed_out=False, reply='Fixture reply to: M1 acceptance run'; artifacts runs/20260911-005853-mock/: screenshot PNG 1440x900, dom html+txt, timeline.json (signals generation_started/stop_button_gone/dom_stable/text_length_stable, 6 polls), reply.json, network.json",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "timeout-fallback and login-wall paths",
+      "command": "pytest tests/test_web_chat_provider.py / tests/test_cli.py",
+      "result": "PASS: stuck stream -> timed_out=True with partial text and exit code 2; never-starting generation -> start timeout; login wall -> LoginRequiredError, send refused, manual login detected by recover_session",
+      "date": "2026-09-11"
+    }
+  ],
+  "failures": [],
+  "decisions": [
+    "M1 drives the browser through a selector-driven WebChatProvider fed by JSON provider profiles; site detail never lives in provider or (future) agent code.",
+    "The browser is always headed: BrowserDriver(headless=True) raises BrowserConfigError, and no stealth/fingerprint/automation-evasion launch flags are used.",
+    "Login is manual by design: recover_session only re-opens the page and waits for a human to sign in; no credential, captcha or risk-control automation exists.",
+    "Completion detection is multi-signal (stop control gone + text unchanged for stable_polls polls + non-empty text) with a mandatory timeout fallback that returns partial text, timed_out=True and a persisted timeline.",
+    "Reply capture priority is network/SSE > copy button > DOM. Network bodies are only read for responses whose request already finished, so an open stream can never block capture.",
+    "Verified offline against a shipped fixture chat page (backend/fixtures/chat_site) that streams SSE, exposes a stop control and can show a login wall; the shipped mock profile is marked verified, while example-web-llm.json is an explicitly UNVERIFIED template - no real web LLM site was driven in this session.",
+    "Artifacts are written per run to runs/<timestamp>-<profile>/ (screenshot, DOM html+text, timeline, reply, network log); runs/ and .browser-profile/ are gitignored.",
+    "playwright is pinned to 1.62.0 in the repo venv so it reuses the Chromium build already installed at C:\\Users\\LIN\\AppData\\Local\\ms-playwright (chromium-1234).",
+    "M1 delivered no frontend or API changes: the browser layer is not yet reachable from the web console (no Tool/AgentLoop may call it until later milestones).",
+    "Subagent delegation was broken in this environment: children inherit the parent agent's create-time route (agent.options), not its live model route, so after a mid-session default-model switch every delegation hit the stale opencode-go provider and failed with 400 MissingSessionID (missing x-opencode-session). Root cause proven from the child session logs and fixed by pinning config.agentOptions (provider commandcode / model deepseek/deepseek-v4.1-flash) on the tool-subagent and tool-subagent-fork rows of the liangshen agent preset; the pin needs a DSH restart or a new session to mount, and the workflow tool passing an explicit provider/model works as an immediate workaround (verified)."
+  ],
+  "notes": [
+    "git init was run by the user on 2026-09-11 (branch master, no commits yet); the M0+M1 working tree is still uncommitted, so the AGENTS.md 'reviewer then commit' step has not been performed.",
+    "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
+    "Image inspection is unavailable to this model, so the screenshot was validated structurally (PNG magic bytes, 1440x900 IHDR, IDAT present) rather than visually.",
+    "Subagent route fix (2026-09-11): ~/.dsh/.agent-presets/liangshen/agent.cordis.yml edited (backup kept next to it) to pin the child agent route; takes effect on the next session/DSH restart, so delegation from the already-running session still uses the stale route."
+  ],
+  "checkpoint": "M1 checkpoint 2026-09-11: browser layer complete (BrowserDriver + ProviderAdapter + WebChatProvider + profiles + artifacts + CLI), 57 backend tests green, full acceptance path verified end-to-end outside pytest against the offline fixture (open -> send -> wait -> capture -> screenshot -> DOM). Next milestone: M2 (State and Context).",
+  "git_branch": "master",
+  "cwd": "H:\\AI-game\\coding-agent"
+}

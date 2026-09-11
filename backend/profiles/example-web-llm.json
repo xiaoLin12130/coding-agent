@@ -1,0 +1,26 @@
+{
+  "name": "example-web-llm",
+  "description": "Template for a real web LLM chat page. Selectors are placeholders and MUST be filled in and verified before use.",
+  "url": "https://your-web-llm.example/chat",
+  "verified": false,
+  "notes": "Unverified template. Workflow: 1) 'python -m app.browser.cli login --profile example-web-llm' and sign in manually in the headed window; 2) 'python -m app.browser.cli inspect --profile example-web-llm' to dump the DOM into runs/; 3) read the selectors off that snapshot and fill them in here; 4) 'python -m app.browser.cli ask --profile example-web-llm --prompt hi'. Login automation, captcha solving and fingerprint evasion are out of scope by project rules.",
+  "ready_selector": null,
+  "input_selector": "textarea",
+  "send_button_selector": null,
+  "send_key": "Enter",
+  "stop_button_selector": null,
+  "assistant_message_selector": "[data-message-author-role='assistant']",
+  "copy_button_selector": null,
+  "copy_status_selector": null,
+  "login_required_selector": null,
+  "login_indicator_selector": null,
+  "network_response_patterns": [],
+  "network_text_path": "delta",
+  "completion": {
+    "timeout_ms": 180000,
+    "start_timeout_ms": 30000,
+    "poll_interval_ms": 500,
+    "stable_polls": 4,
+    "min_wait_ms": 500
+  }
+}

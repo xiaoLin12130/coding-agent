@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Fixture Web LLM</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; background: #0f1115; color: #e5e7eb; }
+      main { max-width: 640px; margin: 0 auto; padding: 24px; }
+      #login-wall { padding: 32px; border: 1px solid #334155; border-radius: 12px; text-align: center; }
+      #messages { display: flex; flex-direction: column; gap: 12px; min-height: 160px; }
+      .message { border-radius: 12px; padding: 10px 14px; }
+      .message.user { background: #1e293b; align-self: flex-end; }
+      .message.assistant { background: #16202e; border: 1px solid #26374d; }
+      .copy { margin-top: 8px; font-size: 12px; }
+      textarea { width: 100%; min-height: 72px; margin-top: 16px; background: #0b1220; color: #e5e7eb; border: 1px solid #334155; border-radius: 10px; padding: 10px; }
+      button { margin-top: 8px; padding: 8px 14px; border-radius: 10px; border: 1px solid #334155; background: #1d283a; color: #e5e7eb; }
+      #copy-status { margin-left: 8px; font-size: 12px; color: #94a3b8; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <div id="login-wall" hidden>
+        <h2>Sign in required</h2>
+        <p>This fixture simulates a page that needs a manual login.</p>
+        <button id="login-button" type="button">Sign in (simulated)</button>
+      </div>
+
+      <section id="chat">
+        <div id="messages"></div>
+        <textarea id="composer" placeholder="Message" aria-label="Message"></textarea>
+        <div>
+          <button id="send" type="button">Send</button>
+          <button id="stop" type="button" hidden>Stop</button>
+          <span id="copy-status"></span>
+        </div>
+      </section>
+    </main>
+
+    <script>
+      const params = new URLSearchParams(window.location.search);
+      let loggedIn = params.get("login") !== "1";
+      const loginWall = document.getElementById("login-wall");
+      const chat = document.getElementById("chat");
+      const messages = document.getElementById("messages");
+      const composer = document.getElementById("composer");
+      const sendButton = document.getElementById("send");
+      const stopButton = document.getElementById("stop");
+      const copyStatus = document.getElementById("copy-status");
+
+      let controller = null;
+
+      function renderAuth() {
+        loginWall.hidden = loggedIn;
+        chat.hidden = !loggedIn;
+      }
+      renderAuth();
+
+      document.getElementById("login-button").addEventListener("click", () => {
+        loggedIn = true;
+        renderAuth();
+      });
+
+      function addMessage(role, text) {
+        const wrapper = document.createElement("div");
+        wrapper.className = "message " + role;
+        wrapper.dataset.role = role;
+
+        const content = document.createElement("div");
+        content.className = "content";
+        content.textContent = text;
+        wrapper.appendChild(content);
+
+        if (role === "assistant") {
+          const copy = document.createElement("button");
+          copy.type = "button";
+          copy.className = "copy";
+          copy.textContent = "Copy";
+          copy.addEventListener("click", async () => {
+            try {
+              await navigator.clipboard.writeText(content.textContent);
+              copyStatus.dataset.state = "copied";
+              copyStatus.textContent = "copied";
+            } catch (error) {
+              copyStatus.dataset.state = "copy-failed";
+              copyStatus.textContent = "copy-failed";
+            }
+          });
+          wrapper.appendChild(copy);
+        }
+
+        messages.appendChild(wrapper);
+        return wrapper;
+      }
+
+      async function send() {
+        const prompt = composer.value.trim();
+        if (!prompt || controller) return;
+
+        addMessage("user", prompt);
+        const assistant = addMessage("assistant", "");
+        const content = assistant.querySelector(".content");
+
+        controller = new AbortController();
+        stopButton.hidden = false;
+        composer.value = "";
+
+        const mode = params.get("mode") || "normal";
+        try {
+          const response = await fetch(
+            "/api/chat?prompt=" + encodeURIComponent(prompt) + "&mode=" + mode,
+            { signal: controller.signal },
+          );
+          const reader = response.body.getReader();
+          const decoder = new TextDecoder();
+          let buffer = "";
+          for (;;) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            buffer += decoder.decode(value, { stream: true });
+            const parts = buffer.split("\n\n");
+            buffer = parts.pop();
+            for (const part of parts) {
+              const line = part.trim();
+              if (!line.startsWith("data:")) continue;
+              const payload = line.slice(5).trim();
+              if (payload === "[DONE]") continue;
+              let parsed;
+              try {
+                parsed = JSON.parse(payload);
+              } catch (error) {
+                continue;
+              }
+              content.textContent += parsed.delta || "";
+            }
+          }
+        } catch (error) {
+          if (error.name !== "AbortError") {
+            content.textContent += " [stream error]";
+          }
+        } finally {
+          stopButton.hidden = true;
+          controller = null;
+        }
+      }
+
+      sendButton.addEventListener("click", send);
+      composer.addEventListener("keydown", (event) => {
+        if (event.key === "Enter" && !event.shiftKey) {
+          event.preventDefault();
+          send();
+        }
+      });
+      stopButton.addEventListener("click", () => {
+        if (controller) controller.abort();
+      });
+    </script>
+  </body>
+</html>

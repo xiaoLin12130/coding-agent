@@ -1,0 +1,28 @@
+{
+  "memories": [
+    {
+      "key": "env.python-venv",
+      "value": "This project uses a repo-level venv at .venv (Python 3.14) containing fastapi, uvicorn[standard], pytest, httpx and playwright==1.62.0. Run the backend with '.venv/Scripts/python.exe -m uvicorn app.main:app --host 127.0.0.1 --port 8000' from backend/, and tests with 'cd backend && ../.venv/Scripts/python.exe -m pytest'.",
+      "source": "M0/M1 setup",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "key": "env.frontend-dev-port",
+      "value": "The frontend dev server is pinned to http://127.0.0.1:5273 (strictPort, host 127.0.0.1) because 127.0.0.1:5173 is already used by an unrelated project (H:\\AiAgentTest_crew) on this machine. On the default port Vite binds IPv6-only and 127.0.0.1:5173 serves the wrong application.",
+      "source": "M0 setup",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "key": "env.playwright",
+      "value": "Playwright is pinned to 1.62.0 in .venv so it shares the browser builds already installed at C:\\Users\\LIN\\AppData\\Local\\ms-playwright (chromium-1234). Headed Chromium launches successfully in this environment; do NOT install a different Playwright version without reinstalling browsers.",
+      "source": "M1 setup",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "key": "env.backend-test-suite",
+      "value": "The backend suite is 'cd backend && ../.venv/Scripts/python.exe -m pytest' (57 tests, ~64s). It launches a real headed Chromium for the browser tests, and pytest's summary line only appears when output is redirected to a file rather than piped to grep.",
+      "source": "M1 setup",
+      "updated_at": "2026-09-11"
+    }
+  ]
+}

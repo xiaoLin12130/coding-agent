@@ -1,0 +1,22 @@
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Node
+node_modules/
+dist/
+coverage/
+
+# Browser layer artifacts (M1)
+runs/
+.browser-profile/
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Local env
+.env

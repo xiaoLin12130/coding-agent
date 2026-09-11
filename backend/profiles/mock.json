@@ -1,0 +1,28 @@
+{
+  "name": "mock",
+  "description": "Deterministic local chat page used by the test suite and for an offline demo of the full M1 acceptance path.",
+  "url": "http://127.0.0.1:8765/",
+  "verified": true,
+  "notes": "Served by 'python -m fixtures.chat_site.server --port 8765' from backend/. Not a real LLM.",
+  "ready_selector": "#composer",
+  "input_selector": "#composer",
+  "send_button_selector": "#send",
+  "send_key": "Enter",
+  "stop_button_selector": "#stop",
+  "assistant_message_selector": "#messages .message.assistant .content",
+  "copy_button_selector": "#messages .message.assistant .copy",
+  "copy_status_selector": "#copy-status[data-state='copied']",
+  "login_required_selector": "#login-wall:not([hidden])",
+  "login_indicator_selector": "#composer",
+  "network_response_patterns": [
+    "/api/chat"
+  ],
+  "network_text_path": "delta",
+  "completion": {
+    "timeout_ms": 60000,
+    "start_timeout_ms": 10000,
+    "poll_interval_ms": 250,
+    "stable_polls": 3,
+    "min_wait_ms": 300
+  }
+}
