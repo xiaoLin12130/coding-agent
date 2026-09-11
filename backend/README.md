@@ -833,3 +833,13 @@ no entry for the runtime's `done` and `error` events, so every run ended as an
 `agent_update` and no client could ever see a run finish or fail. The test that
 covered it waited forever for a frame that could not arrive. Both names are
 mapped now (`app/api/ws.py`) and guarded by tests.
+
+`tests/manual/live_console_check.py` is the one check the offline suite cannot
+make: it starts a real `uvicorn` process, selects the **scripted** provider
+through the settings document and watches a run reach a real browser WebSocket,
+ending with `done`. It is not collected by pytest (it binds ports and launches
+a browser); run it by hand:
+
+```bash
+cd backend && ../.venv/Scripts/python.exe tests/manual/live_console_check.py
+```

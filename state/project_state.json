@@ -176,7 +176,8 @@
     "backend/tests/test_evaluation_cli.py",
     "backend/tests/test_evaluation_regression.py",
     "backend/tests/test_ws.py",
-    "docs/testing.md"
+    "docs/testing.md",
+    "backend/tests/manual/live_console_check.py"
   ],
   "tests": [
     {
@@ -285,6 +286,12 @@
       "name": "backend pytest (M0..M9), whole suite in one run",
       "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
       "result": "840 passed in 223s (browser files included)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M9 live console check (real uvicorn + real browser WebSocket)",
+      "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/live_console_check.py",
+      "result": "PASS: /api/settings served adapter=scripted with the 3-provider catalog; a run started from the scripted plan reached a real Chromium WebSocket as message, agent_update*, assistant_delta, tool_call, tool_result, state_update, assistant_delta, agent_update, done - the terminal 'done' frame the M8 mapping never delivered",
       "date": "2026-09-11"
     }
   ],
@@ -399,7 +406,9 @@
     "Evaluation reports are written to runs/evaluation/<stamp>/ (gitignored); the golden sets themselves are committed under backend/evaluation/.",
     "docs/api-protocol.md lists memory_update among the WebSocket events, but the runtime has no memory-change event and none was invented: it is the one documented event a client cannot receive, and tests/test_ws.py records that exception explicitly.",
     "Evaluation is fully offline: no browser, no network and no real model are involved, so it runs in about 4 seconds and can gate every change.",
-    "M8 + M9 are committed as c36b8c3 (105 files). state/checkpoints/ is now gitignored: 2771 checkpoint files from earlier runs had been picked up by 'git add' and are runtime data, like state/sessions/."
+    "M8 + M9 are committed as c36b8c3 (105 files). state/checkpoints/ is now gitignored: 2771 checkpoint files from earlier runs had been picked up by 'git add' and are runtime data, like state/sessions/.",
+    "The live console check (backend/tests/manual/live_console_check.py) is kept out of the pytest suite on purpose: it binds two ports and launches Chromium. It is the only check that proves provider selection AND the terminal done frame against a real server instead of the ASGI test client.",
+    "The check drives the SCRIPTED provider, so a full console run - provider selection, REST, WebSocket and the tool chain - can be exercised end to end with no web LLM, no login and no network."
   ],
   "checkpoint": "M9 checkpoint 2026-09-11: provider registry with three adapters (browser, offline scripted, OpenAI-compatible HTTP) selectable from the settings document without touching the AgentLoop; golden parser set of 50 cases over the eight required categories; 15 agent scenarios over the six required dimensions running the real stack with fault injection; thresholds, markdown/JSON report and an evaluation CLI; regression gate in pytest. 840 backend tests (800 non-browser + 40 browser) and 66 frontend tests green. A real M8 defect (the WebSocket never delivered 'done' or 'error') was found and fixed along the way. Project milestone list is now complete: M0..M9.",
   "git_branch": "main",
