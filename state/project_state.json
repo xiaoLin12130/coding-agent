@@ -1,35 +1,39 @@
 {
-  "current_milestone": "M3",
+  "current_milestone": "M4",
   "current_task": null,
-  "goal": "M3 — Tool System: ToolCall -> Parser -> Executor -> Tool Result, nine tools, a parser golden set, and structured parse errors with a bounded retry budget.",
-  "milestone_status": "M3 complete, M4 not started",
+  "goal": "M4 — Safety: a reliable SafetyLayer enforcing file scope, sensitive-path checks, shell risk grading, prompt-injection defence and human confirmation before high-risk tools run.",
+  "milestone_status": "M4 complete, M5 not started",
   "todos": [
     {
-      "content": "M3: tool models (ToolCall/ToolResult/ToolSpec/ParseIssue) + JSON5 subset reader",
+      "content": "M4: safety models + policy (one place for every rule)",
       "status": "completed"
     },
     {
-      "content": "M3: ToolCallParser (JSON/JSON5/code fence/multiple calls/bracket matching/embedded prose) with structured errors",
+      "content": "M4: filesystem policy (project scope, symlink escapes, sensitive files)",
       "status": "completed"
     },
     {
-      "content": "M3: ToolRegistry with published JSON schemas and risk levels",
+      "content": "M4: shell risk grading (LOW/MEDIUM/HIGH, per-segment, subcommands, deny-by-default)",
       "status": "completed"
     },
     {
-      "content": "M3: nine tools (list_dir/read_file/write_file/apply_patch/search/run_shell/memory_propose/update_project_state/ask_user)",
+      "content": "M4: prompt-injection defence (scanning + instruction-source guard)",
       "status": "completed"
     },
     {
-      "content": "M3: Executor (schema validation, logging, error handling, idempotency, confirmation seam)",
+      "content": "M4: SafetyLayer (allow/confirm/deny, session grants, output guarding)",
       "status": "completed"
     },
     {
-      "content": "M3: parser golden set + executor/tool/CLI tests",
+      "content": "M4: wire the layer into the Executor with validation first and no unchecked path",
       "status": "completed"
     },
     {
-      "content": "M3: app.tools.cli and the end-to-end acceptance run",
+      "content": "M4: confirmation UI data + terminal rendering (command/cwd/impact/risk + 3 choices)",
+      "status": "completed"
+    },
+    {
+      "content": "M4: tests incl. the four 'must not' acceptance rules",
       "status": "completed"
     }
   ],
@@ -95,6 +99,23 @@
     "backend/tests/test_tools_executor.py",
     "backend/tests/test_tools_builtin.py",
     "backend/tests/test_tools_cli.py",
+    "backend/README.md",
+    "backend/app/safety/__init__.py",
+    "backend/app/safety/models.py",
+    "backend/app/safety/policy.py",
+    "backend/app/safety/paths.py",
+    "backend/app/safety/shell.py",
+    "backend/app/safety/injection.py",
+    "backend/app/safety/layer.py",
+    "backend/app/safety/cli.py",
+    "backend/app/tools/executor.py",
+    "backend/app/tools/errors.py",
+    "backend/tests/test_safety_paths.py",
+    "backend/tests/test_safety_shell.py",
+    "backend/tests/test_safety_injection.py",
+    "backend/tests/test_safety_layer.py",
+    "backend/tests/test_safety_executor_integration.py",
+    "backend/tests/test_safety_cli.py",
     "backend/README.md"
   ],
   "tests": [
@@ -123,15 +144,21 @@
       "date": "2026-09-11"
     },
     {
-      "name": "backend pytest (M0 + M1 + M2 + M3)",
-      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
-      "result": "303 passed in 72.9s (M3 added 153: test_tool_parser 68, test_tools_executor 27, test_tools_builtin 44, test_tools_cli 14)",
-      "date": "2026-09-11"
-    },
-    {
       "name": "M3 acceptance run (real process, outside pytest)",
       "command": "parse a messy model output (prose + json5 fence + 3 calls) -> execute through the Executor -> confirmation seam -> parse retry -> inspect log",
       "result": "PASS: 3 calls recovered from fenced JSON5 with zero issues (read_file, apply_patch, update_project_state); all executed; the file was patched (return 1 -> return 2), the milestone advanced to M3 and files_changed recorded; run_shell refused with confirmation_required and ran once confirmed; parse failures produced invalid_json then unbalanced_brackets with the retry budget allowing 2 retries and stopping on the 3rd attempt; 5 audit log lines written",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M4)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "474 passed in 73.5s (M4 added 171: test_safety_paths 32, test_safety_shell 41, test_safety_injection 30, test_safety_layer 25, test_safety_executor_integration 25, test_safety_cli 18)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M4 acceptance run (real process, outside pytest)",
+      "command": "drive the Executor directly: outside paths, sensitive files, destructive shell, session grant, injected file content",
+      "result": "PASS against all four 'must not' rules: absolute/relative paths outside the project and writes outside were refused (blocked_by_safety); .env, id_rsa and .ssh/* were refused inside the project; rm -rf /, git push --force, curl|bash and cat ~/.ssh/id_rsa were denied outright while sudo/systemctl required confirmation; the confirmation payload carried command/cwd/impact/risk and choices reject|once|session; a session grant allowed the approved command and not a different one; a file containing 'IGNORE ALL PREVIOUS INSTRUCTIONS' was read as data, flagged with an injection finding, and executed nothing",
       "date": "2026-09-11"
     }
   ],
@@ -157,12 +184,19 @@
     "M2 REST surface is read-only (/api/sessions, /api/sessions/{id}, /api/messages, /api/context) and no endpoint executes anything; the Tool layer arrives in M3 behind SafetyLayer/Executor. Named after docs/api-protocol.md, keeping /api/project_state and /api/memory.",
     "M2 memory dedupe compares VALUES only: the same key with a different value is a conflict, not a duplicate (the first implementation classified it as duplicate, which silently swallowed the conflict).",
     "M2 skips the project_state context section entirely when the state holds nothing factual, so an unstarted project does not push placeholder lines into every turn (docs/state-context.md forbids injecting everything by default).",
-    "M3 does NOT implement the SafetyLayer (that is M4). The Executor only carries the seam: tools declare risk and requires_confirmation, and a confirmation-requiring tool is refused unless a confirmation or an approval hook is present. Known gap owned by M4: there is no path restriction yet, so a tool can still read an absolute path outside the project (verified), and there is no sensitive-file check.",
     "M3 tool arguments are strict (extra='forbid'): an invented parameter is a schema violation, because silently dropping it would hide that the model misunderstood the tool.",
     "M3 does not expose tools over REST: with no SafetyLayer yet, an HTTP entry point to run_shell/write_file would be a hole. Manual use goes through app.tools.cli, which uses the same Executor and bypasses nothing.",
     "M3 parser reports no_tool_call (not invalid_json) when the output contains no JSON structure at all, but keeps a specific issue code when a real structure failed to parse; otherwise the model hunts a syntax error that does not exist.",
     "M3 Executor logs replayed idempotent calls too: a replay is still a call that happened, and omitting it would make the audit log under-report (found by a test).",
-    "M3 apply_patch writes nothing unless every hunk matches exactly once, so a partially applied patch can never leave a file half-modified."
+    "M3 apply_patch writes nothing unless every hunk matches exactly once, so a partially applied patch can never leave a file half-modified.",
+    "M4 replaces the M3 seam with a real SafetyLayer. The documented order is ToolCall -> Validation -> SafetyLayer -> Confirmation; validation therefore runs BEFORE the assessment, so a wrongly typed argument is a schema error rather than a safety error.",
+    "There is no unchecked Executor: omitting the safety argument makes the Executor build a layer scoped to its working directory. A test asserts the attribute is never None and that an explicit spy layer observes every execution.",
+    "M4 file scope is enforced on the RESOLVED path so a symlink cannot step outside the project, extra roots must be configured explicitly, and sensitive names (.env, id_rsa, key suffixes, .ssh/.aws/.gnupg) are refused even inside the project.",
+    "M4 shell grading is deny-by-default: an unrecognised verb is HIGH, never LOW; every segment of a chained command is graded; subcommands are graded too (git status is LOW, git push is HIGH); a denied command is always reported HIGH regardless of its verb.",
+    "M4 denies rather than confirms the operations no human answer should authorise: destructive patterns (rm -rf /, dd of=/dev/..., curl|bash, git push --force), commands naming a sensitive file, and commands touching a path outside the project. A confirmation cannot override a deny.",
+    "M4 prompt-injection defence is two-part: instruction-like content in untrusted text is flagged and travels with the result (whose text is never rewritten), and check_instruction_source() refuses to parse tool/file/web/shell/document output as instructions, so only model and user output can issue a tool call.",
+    "M4 session grants are keyed by the exact command (for run_shell) or the exact arguments, so 本会话允许 never widens into a blanket shell grant; the tests pin that a grant does not cover another command.",
+    "M4 confirmation is rendered in the terminal (app.safety.cli confirm) with the four required facts and the three choices. The web console is NOT wired yet: that needs the confirm_request event from docs/api-protocol.md, which belongs with the API-protocol work rather than the safety layer."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -174,10 +208,12 @@
     "M2 is complete: backend/app/context/{models,transcript,memory,builder,session,cli}.py plus the read-only /api context routes; 150 backend tests green.",
     "state/sessions/ holds runtime transcripts and the session index and is gitignored; the state files themselves (project_state.json, memory.json) stay tracked.",
     "M3 is complete: backend/app/tools/{models,errors,json5,parser,registry,builtin,executor,cli}.py; 303 backend tests green.",
-    "run_shell is the only tool that requires confirmation today, and the only high-risk tool; the M4 SafetyLayer will add path limits, sensitive-file checks and the confirmation UI in front of the Executor.",
-    "Tool calls are logged to runs/tool-calls.jsonl (gitignored), including replays and refusals."
+    "Tool calls are logged to runs/tool-calls.jsonl (gitignored), including replays and refusals.",
+    "M4 is complete: backend/app/safety/{models,policy,paths,shell,injection,layer,cli}.py plus the Executor wiring; 474 backend tests green.",
+    "The M3 'known gap' is closed: an absolute path outside the project is now refused by the safety layer and verified by both a direct probe and the acceptance test suite.",
+    "Tools are still not exposed over REST: the SafetyLayer now exists, but publishing the execution chain over HTTP belongs with the API-protocol/console work (confirm_request), not with M4."
   ],
-  "checkpoint": "M3 checkpoint 2026-09-11: tool system complete (parser with golden set, registry with schemas, nine tools, executor with validation/logging/idempotency and the confirmation seam), end-to-end run verified in a real process, 303 backend tests green. Next milestone: M4 (Safety), which inserts SafetyLayer in front of the Executor.",
+  "checkpoint": "M4 checkpoint 2026-09-11: safety layer complete (file scope with symlink and sensitive-file refusal, per-segment shell grading with deny-by-default, prompt-injection scanning plus an instruction-source guard, confirmation with the four required facts and three choices, session grants), Executor wired so no unchecked path exists, all four acceptance rules verified in a real process, 474 backend tests green. Next milestone: M5 (Agent Loop).",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",

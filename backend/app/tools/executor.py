@@ -4,11 +4,10 @@ docs/safety.md fixes the chain:
 
     ToolCall -> Validation -> SafetyLayer -> Confirmation -> Executor -> Tool
 
-M3 builds everything except SafetyLayer (that is M4). What M3 does provide is
-the seam M4 plugs into: tools declare a risk level and whether they need
-confirmation, and the Executor refuses to run a confirmation-requiring tool
-unless an approval hook or an explicit confirmation is present. No policy
-lives here — no path limits, no sensitive-file list, no UI.
+Every call is assessed by the SafetyLayer (M4) before anything runs. There is
+no code path that reaches a tool handler without one: when the caller does not
+supply a layer, the Executor builds one scoped to the working directory, so the
+default is still "checked", never "unchecked".
 
 The Executor also owns what docs/safety.md requires of it: schema validation,
 logging, error handling and idempotency.
@@ -21,13 +20,17 @@ import json
 import time
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
 
 from pydantic import ValidationError
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from ..safety import SafetyLayer
 
 from .builtin import ToolContext, ToolOutcome, build_default_registry
 from .errors import (
     ConfirmationRequiredError,
+    SafetyBlockedError,
     ToolError,
     ToolExecutionError,
     ToolNotFoundError,
@@ -36,8 +39,8 @@ from .errors import (
 from .models import ToolCall, ToolCallLogEntry, ToolErrorInfo, ToolResult
 from .registry import ToolRegistry
 
-# An approval hook returns True to allow the call. M4 replaces this with the
-# real SafetyLayer + confirmation UI.
+# An approval hook returns True to allow the call (a non-interactive way to
+# answer the confirmation the SafetyLayer asks for).
 ApprovalHook = Callable[[ToolCall], bool]
 
 LOG_FILE_NAME = "tool-calls.jsonl"
@@ -62,12 +65,23 @@ class Executor:
         log_path: Path | str | None = None,
         approval: ApprovalHook | None = None,
         replay_cache: bool = True,
+        safety: "SafetyLayer | None" = None,
     ) -> None:
         self.registry = registry or build_default_registry()
         self.context = context
         self.log_path = Path(log_path) if log_path is not None else None
         self.approval = approval
         self.replay_cache = replay_cache
+        # Imported here rather than at module scope so app.tools and app.safety
+        # do not import each other at package initialisation time.
+        if safety is None:
+            from ..safety import SafetyLayer
+
+            working_dir = (
+                Path(context.working_dir) if context is not None else Path.cwd()
+            )
+            safety = SafetyLayer.for_project(working_dir)
+        self.safety = safety
         self._cache: dict[str, ToolResult] = {}
         self._log: list[ToolCallLogEntry] = []
 
@@ -84,12 +98,29 @@ class Executor:
             tool = self.registry.get(call.name)  # raises ToolNotFoundError
             risk = tool.spec.risk
 
-            if tool.spec.requires_confirmation and not (
-                confirmed or (self.approval is not None and self.approval(call))
-            ):
-                raise ConfirmationRequiredError(
-                    "tool " + call.name + " requires confirmation before it runs"
+            # 1. Validation first, then the SafetyLayer — the documented order
+            #    (ToolCall -> Validation -> SafetyLayer -> Confirmation).
+            args = tool.args_model.model_validate(call.arguments)
+
+            # 2. SafetyLayer: allow / confirm / deny, before anything runs.
+            verdict = self.safety.assess(call, spec=tool.spec)
+            if verdict.decision == "deny":
+                raise SafetyBlockedError(
+                    "blocked by the safety layer: " + "; ".join(verdict.reasons),
+                    details={"reasons": verdict.reasons, "risk": verdict.risk},
                 )
+            if verdict.confirmation is not None and not confirmed:
+                granted = self.approval is not None and self.approval(call)
+                if not granted:
+                    request = verdict.confirmation
+                    raise ConfirmationRequiredError(
+                        "tool " + call.name + " requires confirmation before it runs",
+                        details={
+                            "confirmation": request.model_dump(mode="json"),
+                            "risk": verdict.risk,
+                            "reasons": verdict.reasons,
+                        },
+                    )
 
             key = idempotency_key(call)
             if tool.spec.idempotent and self.replay_cache:
@@ -106,19 +137,26 @@ class Executor:
                     self._record(replayed, call, True)
                     return replayed
 
-            args = tool.args_model.model_validate(call.arguments)
             outcome = tool.handler(args, self.context)
+
+            # 3. Guard the output: tool text is DATA, and any instruction-like
+            #    content inside it is flagged rather than honoured.
+            output, injection_findings = self.safety.guard_output(outcome.output)
+            data = dict(outcome.data)
+            data["untrusted"] = True
+            if injection_findings:
+                data["injection_findings"] = injection_findings
 
             finished_at = datetime.now(timezone.utc)
             result = ToolResult(
                 tool_call_id=call.id,
                 name=call.name,
                 ok=True,
-                output=outcome.output,
+                output=output,
                 risk=risk,
                 duration_ms=int((time.monotonic() - started) * 1000),
                 artifacts=list(outcome.artifacts),
-                data=dict(outcome.data),
+                data=data,
                 started_at=started_at,
                 finished_at=finished_at,
             )

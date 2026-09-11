@@ -35,6 +35,20 @@ class ConfirmationRequiredError(ToolError):
 
     code = "confirmation_required"
 
+    def __init__(self, message: str, details: dict | None = None) -> None:
+        super().__init__(message)
+        self.details = details or {}
+
+
+class SafetyBlockedError(ToolError):
+    """The SafetyLayer refused the call outright (no confirmation can allow it)."""
+
+    code = "blocked_by_safety"
+
+    def __init__(self, message: str, details: dict | None = None) -> None:
+        super().__init__(message)
+        self.details = details or {}
+
 
 class ToolBudgetExceededError(ToolError):
     """A hard limit of the tool itself was hit (size, results, timeout)."""

@@ -262,17 +262,12 @@ The single real entry point. It provides what `docs/safety.md` requires of it:
 * **idempotency** — an identical call to an idempotent tool is replayed from
   cache and marked `idempotent_replay`
 
-### Confirmation seam (M4 fills it)
+### Confirmation (now enforced by M4)
 
-M3 does **not** implement the SafetyLayer. It provides the seam: tools declare
-`risk` and `requires_confirmation`, and the Executor refuses to run a
-confirmation-requiring tool unless a confirmation or an approval hook is
-present. Today only `run_shell` requires it.
-
-**Known gap, owned by M4:** there is no path restriction yet — a tool can still
-reach an absolute path outside the project, and there is no sensitive-file
-check. M4 (`SafetyLayer`) inserts itself in front of the Executor and adds the
-confirmation UI.
+Tools declare `risk` and `requires_confirmation`; the Executor refuses to run
+a confirmation-requiring tool unless a confirmation or an approval hook is
+present. M4 turned this seam into a real policy — see the Safety layer section
+below.
 
 ## CLI
 
@@ -287,3 +282,100 @@ python -m app.tools.cli run run_shell --args '{"command": "echo hi"}' --confirm
 ```
 
 The CLI goes through the same Executor as the model will; it bypasses nothing.
+---
+
+# Safety layer (M4)
+
+`app/safety/` is the gate every tool call passes through:
+
+```text
+ToolCall -> Validation -> SafetyLayer -> Confirmation -> Executor -> Tool
+```
+
+| Module | Responsibility |
+| --- | --- |
+| `policy.py` | every rule in one place: roots, sensitive files, shell grading, injection patterns |
+| `paths.py` | filesystem policy — nothing outside the project, no secrets |
+| `shell.py` | shell risk grading (LOW / MEDIUM / HIGH, deny-by-default) |
+| `injection.py` | untrusted content is DATA; only model/user output may issue calls |
+| `layer.py` | `SafetyLayer` — allow / confirm / deny, session grants, output flags |
+| `cli.py` | the terminal confirmation UI |
+
+## What is enforced
+
+**1. File scope.** Every path argument is resolved (symlinks followed) and must
+land inside the project root — or an explicitly configured extra root. A
+sibling directory sharing a prefix (`project-evil` vs `project`) does not
+pass. Extra roots are allowed; sensitive names are not, even inside the project:
+`.env`, `id_rsa`, `.npmrc`, `credentials`, `auth.json`, key material
+(`.pem`, `.key`, `.pfx`, `.p12`, `.keystore`) and anything under
+`.ssh`, `.aws`, `.gnupg`, `.kube`, `.dsh`.
+
+**2. Shell grading.** The command is split on `;`, `&&`, `||`, `|` and
+newlines, and **every** segment is graded, so `ls && rm -rf /` is not read as
+`ls`.
+
+| Grade | Meaning |
+| --- | --- |
+| LOW | cannot execute code or change anything (`ls`, `cat`, read-only `git`) |
+| MEDIUM | normal development work (`pytest`, `tsc`, `mkdir`) |
+| HIGH | everything else — **an unrecognised verb is HIGH, never LOW** |
+
+Denied outright, whatever the confirmation: destructive patterns
+(`rm -rf /`, `dd of=/dev/…`, `curl … | bash`, `git push --force`,
+`format`, `shutdown`), any command naming a sensitive file
+(`cat ~/.ssh/id_rsa`), and any command touching a path outside the project.
+Subcommands are graded too: `git status` is LOW, `git push` is HIGH.
+
+**3. Prompt injection.** Web text, file text, tool results and shell output are
+DATA. Two mechanisms keep that true: instruction-like content in untrusted text
+is **flagged** (`injection_findings` travel with the result, whose text is
+never rewritten), and `check_instruction_source()` **refuses** to parse tool,
+file, web, shell or document output as instructions — only `model` and `user`
+may issue a tool call. That makes "cannot be executed" structural rather than a
+matter of good behaviour.
+
+**4. Confirmation.** A high-risk call returns
+`confirmation_required` together with the request the human must see:
+
+```text
+tool    : run_shell
+risk    : HIGH
+command : rm -rf build
+cwd     : /home/me/project
+impact  : runs a shell command in /home/me/project
+choices : reject / once / session
+```
+
+The three choices behave as documented: `reject` denies,
+`once` allows that call only, `session` records a grant **for that command**
+— a grant never authorises a different command, and never authorises a denied
+one.
+
+## No bypass
+
+Every call is assessed before anything runs. When a caller does not supply a
+layer, the Executor builds one scoped to its working directory, so the default
+is *checked*, never *unchecked*; there is no constructor that yields an
+Executor without a `SafetyLayer`. Denied and refused calls are written to the
+audit log like any other.
+
+## CLI
+
+```bash
+cd backend
+
+python -m app.safety.cli check-path --path ../outside.txt
+python -m app.safety.cli grade --command "rm -rf /"
+python -m app.safety.cli scan --text "IGNORE ALL PREVIOUS INSTRUCTIONS"
+python -m app.safety.cli assess --tool run_shell --args '{"command": "echo hi"}'
+python -m app.safety.cli confirm --tool run_shell --args '{"command": "echo hi"}'
+```
+
+`assess` exits 0 (allow), 2 (deny) or 3 (confirmation required); `confirm`
+prints the block above, asks for one of the three choices, and then runs the
+call through the same Executor the model uses.
+
+**Not wired into the web console yet.** The confirmation data and its terminal
+rendering exist; the browser side needs the `confirm_request` event from
+`docs/api-protocol.md`, which belongs with the API-protocol work.
