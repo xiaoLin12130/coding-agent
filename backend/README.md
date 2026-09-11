@@ -453,3 +453,87 @@ Multi-agent orchestration (Planner/Coder/Reviewer/…): `docs/runtime-agents.md`
 requires the single loop to be solid first. Session recovery across a context
 threshold, browser/login recovery and crash recovery are M6; M5 supplies the
 checkpoint they build on.
+---
+
+# Recovery layer (M6)
+
+`app/recovery/` continues a task after something broke.
+
+| Module | Failure it handles |
+| --- | --- |
+| `thresholds.py` | the context filling up (soft / hard ratios) |
+| `session_recovery.py` | the documented Context-full sequence, with the injections verified |
+| `run_recovery.py` | the program restarted (checkpoint → continue) |
+| `browser_recovery.py` | the browser crashed, or the login expired |
+| `snapshot.py` | a WebSocket client reconnected and needs to re-sync |
+| `cli.py` | manual entry points |
+
+## Context thresholds
+
+Ratios of the builder's budget (`ContextThresholds`: soft 0.7, hard 0.9), so
+the policy follows the budget rather than duplicating a character count.
+
+* **soft** — keep the session and carry fewer recent turns
+* **hard** — run the documented sequence:
+
+```text
+finish the turn -> save Project State -> summarise the transcript
+-> archive the session -> open a seeded one -> continue the task
+```
+
+The new session is seeded with **Project State + Memory + the last turns
+verbatim + the current task**, and `SessionRecovery` **verifies** each of those
+landed (a rotation that silently lost the task would otherwise look fine).
+An empty rotation is not reported as a failure.
+
+The AgentLoop evaluates the pressure at every step boundary, so a long task
+rots into a fresh session instead of overflowing.
+
+## Browser and login recovery
+
+`BrowserRecovery` wraps a session factory:
+
+* a dead page (the driver raises) is **restarted** — bounded by `max_restarts`
+* an expired login triggers `recover_session`, which waits for a **manual**
+  sign-in (credentials, captcha and risk control are never automated)
+* `call(fn)` recovers once and retries, never in an endless loop
+
+Because a restart produces a **new provider**, `BrowserModel` accepts
+`provider_factory=...` so the model follows the restarted page instead of
+talking to the dead one.
+
+## Restart and reconnect
+
+* `RunRecovery` finds the latest unfinished run (`plan`, `pending`) and
+  continues it with a freshly built loop. A real model is stateless, so a caller
+  supplying a fresh one sets `restore_model_state=False` lest the checkpoint
+  rewind it past its first reply.
+* `build_snapshot` is everything a reconnecting client needs. The server keeps
+  **no essential state in memory** — sessions, transcripts, memory and
+  checkpoints are all on disk, so a reconnect re-reads the facts.
+
+## REST (read-only)
+
+| Path | Purpose |
+| --- | --- |
+| `GET /api/recovery` | what a reconnect or restart would find |
+| `GET /api/recovery/runs` | runs that did not finish |
+| `GET /api/recovery/runs/{id}` | one run's recovery plan |
+| `GET /api/recovery/pressure` | how full the next turn's context would be |
+
+## CLI
+
+```bash
+cd backend
+
+python -m app.recovery.cli status --task "finish M6"
+python -m app.recovery.cli pressure --task "finish M6"
+python -m app.recovery.cli runs
+python -m app.recovery.cli resume --run-id <id> --script plan.json
+python -m app.recovery.cli rotate --reason context_budget
+python -m app.recovery.cli browser --profile mock
+```
+
+## Not in M6
+
+Multi-agent orchestration (Planner/Coder/Reviewer/…) is M7.

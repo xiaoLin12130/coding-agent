@@ -9,6 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .api import context as context_api
+from .api import recovery as recovery_api
 from .api import routes, ws
 from .config import APP_NAME, APP_VERSION
 
@@ -26,4 +27,5 @@ app.add_middleware(
 
 app.include_router(routes.router, prefix="/api", tags=["api"])
 app.include_router(context_api.router, prefix="/api", tags=["context"])
+app.include_router(recovery_api.router, prefix="/api", tags=["recovery"])
 app.include_router(ws.router, tags=["ws"])

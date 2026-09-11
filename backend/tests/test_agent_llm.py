@@ -56,7 +56,28 @@ def test_callable_model_wraps_a_function() -> None:
 def test_models_satisfy_the_protocol() -> None:
     assert isinstance(ScriptedModel([]), ModelClient)
     assert isinstance(CallableModel(lambda p, s: ""), ModelClient)
-    assert isinstance(BrowserModel(provider=None), ModelClient)
+    assert isinstance(BrowserModel(FakeProvider()), ModelClient)
+    assert isinstance(BrowserModel(provider_factory=lambda: FakeProvider()), ModelClient)
+
+
+def test_browser_model_needs_a_page() -> None:
+    """A browser model with no provider could only fail later, so it refuses."""
+    with pytest.raises(ValueError):
+        BrowserModel()
+
+
+def test_browser_model_follows_a_provider_factory() -> None:
+    """Recovery replaces the page; the model must talk to the new one."""
+    first = FakeProvider(replies=["from the first page"])
+    second = FakeProvider(replies=["from the restarted page"])
+    current = {"provider": first}
+    model = BrowserModel(provider_factory=lambda: current["provider"])
+
+    assert model.complete("p").text == "from the first page"
+
+    current["provider"] = second  # the page crashed and was rebuilt
+
+    assert model.complete("p").text == "from the restarted page"
 
 
 # --- browser-backed model -------------------------------------------------

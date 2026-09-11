@@ -15,7 +15,7 @@ reply is MODEL content and only model content may be parsed as instructions
 
 from __future__ import annotations
 
-from typing import Any, Callable, Protocol, runtime_checkable
+from typing import Any, Callable, Protocol, runtime_checkable  # noqa: F401
 
 from .models import ModelReply
 
@@ -111,14 +111,33 @@ class BrowserModel:
     The provider owns sending, completion detection and reply capture; this
     class only adapts it to the ModelClient contract and keeps the captured
     artifacts for the run log.
+
+    Pass 'provider_factory' instead of 'provider' when the page can be
+    recovered: a crashed browser is replaced by a NEW provider, and a model
+    holding the old one would keep talking to a dead page.
     """
 
     name = "browser"
 
-    def __init__(self, provider: Any, label: str = "browser") -> None:
-        self.provider = provider
+    def __init__(
+        self,
+        provider: Any = None,
+        label: str = "browser",
+        provider_factory: Callable[[], Any] | None = None,
+    ) -> None:
+        if provider is None and provider_factory is None:
+            raise ValueError("BrowserModel needs a provider or a provider_factory")
+        self._provider = provider
+        self._provider_factory = provider_factory
         self.name = label
         self.last_reply: Any = None
+
+    @property
+    def provider(self) -> Any:
+        """The provider to use now: the factory wins when one was supplied."""
+        if self._provider_factory is not None:
+            return self._provider_factory()
+        return self._provider
 
     def complete(self, prompt: str, system: str | None = None) -> ModelReply:
         text = prompt if not system else system + "\n\n" + prompt

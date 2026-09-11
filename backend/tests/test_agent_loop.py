@@ -618,6 +618,32 @@ def test_a_run_can_be_resumed_from_its_checkpoint(env) -> None:
     assert model.calls, "the resumed run asked the model again"
 
 
+def test_a_fresh_model_is_not_rewound_by_the_checkpoint(env) -> None:
+    """Supplying a new model must not skip its first reply."""
+    project, _executor, sessions, builder = env
+    (project / "a.txt").write_text("x", encoding="utf-8")
+    first = loop_for(
+        env, [call("read_file", path="a.txt")], max_steps=1, repeat_threshold=99
+    )
+    first.run("t", run_id="fresh-model")
+
+    model = ScriptedModel([call("list_dir", path="."), "done"])
+    resumed = AgentLoop(
+        model,
+        _executor,
+        sessions,
+        builder=builder,
+        limits=LoopLimits(max_steps=4, timeout_ms=30_000),
+        checkpoints=CheckpointStore(project / "state" / "checkpoints"),
+        restore_model_state=False,
+    )
+
+    result = resumed.run("t", run_id="fresh-model", resume=True)
+
+    assert result.status == "completed"
+    assert result.tool_summary() == {"list_dir": 1}, "the new model's first reply ran"
+
+
 def test_resume_without_a_checkpoint_is_refused(env) -> None:
     loop = loop_for(env, ["x"])
 

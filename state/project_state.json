@@ -1,39 +1,43 @@
 {
-  "current_milestone": "M5",
+  "current_milestone": "M6",
   "current_task": null,
-  "goal": "M5 — Agent Loop: the full cycle LLM -> ToolCallParser -> SafetyLayer -> Executor -> Tool Result -> Context -> LLM with max steps, timeout, user interrupt, tool retry, checkpoint and loop detection.",
-  "milestone_status": "M5 complete, M6 not started",
+  "goal": "M6 — Session Recovery: continue a task after a browser crash, a WebSocket disconnect, an expired login, a program restart or a context that reached its threshold.",
+  "milestone_status": "M6 complete, M7 not started",
   "todos": [
     {
-      "content": "M5: agent models (limits, events, step records, run result, checkpoint)",
+      "content": "M6: context thresholds (soft/hard ratios) + pressure policy",
       "status": "completed"
     },
     {
-      "content": "M5: model clients (ScriptedModel, CallableModel, BrowserModel)",
+      "content": "M6: soft-threshold compaction (carry fewer recent turns, keep the session)",
       "status": "completed"
     },
     {
-      "content": "M5: CheckpointStore with atomic writes and resume",
+      "content": "M6: hard-threshold sequence (save state -> summarise -> archive -> reseed -> continue) with injections verified",
       "status": "completed"
     },
     {
-      "content": "M5: AgentLoop with max steps, timeout, interrupt, tool retry, parse retry, loop detection",
+      "content": "M6: Project State / Memory / Recent Transcript / task injection into the new session",
       "status": "completed"
     },
     {
-      "content": "M5: confirmation hook and safety enforcement inside the loop",
+      "content": "M6: RunRecovery (program restart from checkpoint, plan/pending/resume)",
       "status": "completed"
     },
     {
-      "content": "M5: tool results recorded in the transcript so history survives",
+      "content": "M6: BrowserRecovery (crash restart, manual login recovery, bounded retry)",
       "status": "completed"
     },
     {
-      "content": "M5: app.agents.cli (run/resume/checkpoints)",
+      "content": "M6: reconnect snapshot + read-only REST surface",
       "status": "completed"
     },
     {
-      "content": "M5: tests incl. the coding-task acceptance and a real-browser integration",
+      "content": "M6: AgentLoop integration + app.recovery.cli",
+      "status": "completed"
+    },
+    {
+      "content": "M6: tests incl. all five acceptance scenarios on the real components",
       "status": "completed"
     }
   ],
@@ -137,6 +141,29 @@
     "backend/tests/test_agent_browser_integration.py",
     "backend/tests/test_tools_executor.py",
     "backend/tests/test_web_chat_provider.py",
+    "backend/README.md",
+    "backend/app/recovery/__init__.py",
+    "backend/app/recovery/models.py",
+    "backend/app/recovery/thresholds.py",
+    "backend/app/recovery/session_recovery.py",
+    "backend/app/recovery/run_recovery.py",
+    "backend/app/recovery/browser_recovery.py",
+    "backend/app/recovery/snapshot.py",
+    "backend/app/recovery/cli.py",
+    "backend/app/api/recovery.py",
+    "backend/app/agents/loop.py",
+    "backend/app/agents/llm.py",
+    "backend/app/agents/models.py",
+    "backend/app/main.py",
+    "backend/tests/test_recovery_thresholds.py",
+    "backend/tests/test_recovery_session.py",
+    "backend/tests/test_recovery_run.py",
+    "backend/tests/test_recovery_browser.py",
+    "backend/tests/test_recovery_api.py",
+    "backend/tests/test_recovery_cli.py",
+    "backend/tests/test_recovery_acceptance.py",
+    "backend/tests/test_agent_llm.py",
+    "backend/tests/test_agent_loop.py",
     "backend/README.md"
   ],
   "tests": [
@@ -177,15 +204,21 @@
       "date": "2026-09-11"
     },
     {
-      "name": "backend pytest (M0..M5)",
-      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
-      "result": "557 passed in 128s (M5 added 83: test_agent_llm 10, test_agent_checkpoint 12, test_agent_loop 39, test_agent_acceptance 6, test_agent_cli 11, test_agent_browser_integration 2, plus 2 executor and 1 provider regression tests)",
-      "date": "2026-09-11"
-    },
-    {
       "name": "M5 acceptance run (real process, outside pytest)",
       "command": "python -m app.agents.cli run --task 'add(2,3) returns -1; fix it and run the check' --script plan.json --confirm once",
       "result": "PASS: status=completed in 4 steps / 3 tool calls (read_file, apply_patch, run_shell); the file changed from 'return a - b' to 'return a + b'; the check reported '1 passed'; the checkpoint recorded step=4 status=completed; 3 audit log entries",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M6)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "632 passed in 215.6s (M6 added 74: thresholds 12, session 11, run 8, browser 17, api 9, cli 7, acceptance 8, plus 2 new loop/llm tests)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M6 acceptance run (real process, outside pytest)",
+      "command": "agents.cli run (stopped at its step budget) -> recovery.cli status -> recovery.cli resume",
+      "result": "PASS: the stopped run left a checkpoint; status reported it resumable at step 1; resume reported found checkpoint / restored session (recovered) / continued (completed); the file changed value = 1 -> value = 2 and the transcript is continuous across the restart (user, read_file, tool result, write_file, tool result, final answer)",
       "date": "2026-09-11"
     }
   ],
@@ -233,7 +266,15 @@
     "Plain prose is a completion signal, not a parse failure: parse retries apply only when nothing usable was parsed, and a partial parse (one good call plus one unknown tool) keeps the good call instead of retrying it away.",
     "The idempotency cache is invalidated by any non-read-only call: a replayed read was showing the agent file content from before a write (found by the acceptance test).",
     "The M1 provider's network capture is scoped to the current exchange via a cursor; before this, a second question on the same page captured the first answer's stream as well (found by the M5 browser integration test).",
-    "Only model and user output may be parsed as instructions; the loop calls the safety instruction-source guard on every reply."
+    "Only model and user output may be parsed as instructions; the loop calls the safety instruction-source guard on every reply.",
+    "M6 context thresholds are ratios of the builder budget (soft 0.7, hard 0.9), so the policy follows whatever budget M2 is configured with instead of duplicating a character count. The loop evaluates them at every step boundary, which is what makes 'finish the turn first' true by construction.",
+    "SessionRecovery verifies the four injections (Project State, Memory, Recent Transcript, current task) instead of assuming them, but treats 'nothing to inject' as satisfied: rotating an empty session is not a failure, and a check that cries wolf gets ignored.",
+    "A rotation carries the last N turns verbatim as well as a bounded summary of the older ones, so the task continues with real conversational context rather than only a summary.",
+    "BrowserRecovery restarts a dead page and waits for a MANUAL login on expiry, bounded by a restart budget and a login timeout; call() retries once after a successful recovery rather than looping around a page that keeps dying.",
+    "BrowserModel now accepts provider_factory. Recovery replaces the page, so a model holding the old provider kept talking to a dead one (found by the M6 browser-crash acceptance test); the factory form is what lets the loop follow the restarted page.",
+    "The AgentLoop gained restore_model_state (default True). A real model is stateless, so the stored snapshot is only a hint for a deterministic one; a caller supplying a fresh model (a new --script, or a rebuilt page) sets it False, otherwise the checkpoint silently rewinds the new model past its first reply (found in the CLI acceptance run).",
+    "The recovery REST surface is read-only; a reconnecting client re-reads facts rather than the server keeping them in memory. FastAPI's legacy '= Query(gt=...)' form does not validate, so the pressure endpoint uses Annotated and maps an inverted threshold pair to 422 rather than a 500.",
+    "M6 did not implement multi-agent orchestration (M7), and did not automate credentials: login recovery only waits for the human, per the project's standing rule."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -251,9 +292,12 @@
     "Tools are still not exposed over REST: the SafetyLayer now exists, but publishing the execution chain over HTTP belongs with the API-protocol/console work (confirm_request), not with M4.",
     "M5 is complete: backend/app/agents/{models,llm,checkpoint,loop,cli}.py; 557 backend tests green.",
     "Known hazard recorded while testing: rewriting a Python file in place with the SAME byte size inside the same mtime second can leave a stale __pycache__ entry, so a later test run reads the previous revision. The acceptance fixture compiles from source to avoid it; a real agent editing Python files can hit this.",
-    "The browser integration test verifies wiring, not answer quality: the offline fixture is an echo server, so its reply is the prompt it received (which contains JSON examples). Content behaviour is covered by the scripted and acceptance tests."
+    "The browser integration test verifies wiring, not answer quality: the offline fixture is an echo server, so its reply is the prompt it received (which contains JSON examples). Content behaviour is covered by the scripted and acceptance tests.",
+    "M6 is complete: backend/app/recovery/{models,thresholds,session_recovery,run_recovery,browser_recovery,snapshot,cli}.py plus the read-only /api/recovery routes and the AgentLoop integration; 632 backend tests green.",
+    "The five M6 acceptance scenarios are covered by real components: program restart (CLI + tests), context threshold (rotation and soft compaction), WebSocket disconnect (snapshot re-sync), browser crash (a real page killed mid-run and restarted), login expiry (a real login wall plus a simulated manual sign-in).",
+    "Recovery is bounded everywhere: a restart budget, a login timeout, one retry per call and a bounded parse retry. Nothing retries forever."
   ],
-  "checkpoint": "M5 checkpoint 2026-09-11: agent loop complete (parser -> safety -> executor -> context cycle, max steps, timeout, interrupt, tool retry, parse retry, cycle-aware loop detection, checkpoints and resume, confirmation hook), coding-task acceptance verified in a real process and against a real browser page, 557 backend tests green. Next milestone: M6 (Session Recovery).",
+  "checkpoint": "M6 checkpoint 2026-09-11: recovery layer complete (context soft/hard thresholds with verified seed injections, checkpoint-based restart, browser crash restart with manual login recovery, reconnect snapshot and a read-only REST surface, wired into the agent loop), all five acceptance scenarios verified on the real components, 632 backend tests green. Next milestone: M7 (Runtime Multi-Agent).",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",

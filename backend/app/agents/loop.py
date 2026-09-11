@@ -16,7 +16,7 @@ import time
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import TYPE_CHECKING, Any, Callable
 
 from ..context.builder import ContextBuilder
 from ..context.session import SessionManager
@@ -25,6 +25,10 @@ from ..tools import Executor, ToolCall
 from ..tools.parser import ParseRetryPolicy, parse_tool_calls, repair_prompt
 from .checkpoint import CheckpointStore
 from .llm import ModelClient, ModelClientError
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from ..recovery.models import ContextThresholds
+    from ..recovery.session_recovery import SessionRecovery
+
 from .models import (
     AgentEvent,
     AgentRunResult,
@@ -61,6 +65,10 @@ class AgentLoop:
         should_stop: Callable[[], bool] | None = None,
         confirm: ConfirmationAnswer | None = None,
         working_dir: Path | str | None = None,
+        thresholds: "ContextThresholds | None" = None,
+        recovery: "SessionRecovery | None" = None,
+        on_model_failure: Callable[[Exception], bool] | None = None,
+        restore_model_state: bool = True,
     ) -> None:
         self.model = model
         self.executor = executor
@@ -76,6 +84,20 @@ class AgentLoop:
         self.should_stop = should_stop
         self.confirm = confirm
         self.working_dir = Path(working_dir) if working_dir else None
+        # M6: context thresholds and the recovery that acts on them.
+        from ..recovery.session_recovery import SessionRecovery
+        from ..recovery.thresholds import ContextPressurePolicy
+
+        self.policy = ContextPressurePolicy(thresholds)
+        self.recovery = recovery or SessionRecovery(sessions, self.builder, self.policy)
+        # Called when the model call fails (a dead browser, for example);
+        # returning True means "retry the call".
+        self.on_model_failure = on_model_failure
+        # A real model is stateless; the stored state is only a hint for a
+        # deterministic one. A caller that supplies a FRESH model (a new script,
+        # or a rebuilt page) sets this False so the checkpoint cannot rewind it.
+        self.restore_model_state = restore_model_state
+        self._soft_applied = False
 
     # -- public API --------------------------------------------------------
 
@@ -111,10 +133,11 @@ class AgentLoop:
         final_message = ""
 
         if checkpoint is not None:
-            try:
-                self.model.restore(checkpoint.model_state)
-            except Exception:  # pragma: no cover - a model without snapshots
-                pass
+            if self.restore_model_state:
+                try:
+                    self.model.restore(checkpoint.model_state)
+                except Exception:  # pragma: no cover - a model without snapshots
+                    pass
             task = checkpoint.task or task
             active_session = checkpoint.session_id
             events.append(
@@ -149,6 +172,49 @@ class AgentLoop:
                 task=task,
                 tool_results=tool_results,
             )
+
+            # --- context thresholds (M6) --------------------------------
+            pressure = self.policy.evaluate(context, self.builder.budget.max_chars)
+            if pressure.needs_rotation:
+                # The turn is over (this is a step boundary), so the documented
+                # sequence can run: save state, summarise, archive, continue.
+                rotation = self.recovery.rotate(reason="context_budget")
+                events.append(
+                    self._event(
+                        "context_rotated",
+                        step_index,
+                        rotation.message,
+                        ok=rotation.recovered,
+                        data=dict(rotation.context),
+                    )
+                )
+                if rotation.recovered:
+                    active_session = str(rotation.context["new_session_id"])
+                    self._soft_applied = False
+                    context = self.builder.build(
+                        session_id=active_session,
+                        system=self.system,
+                        task=task,
+                        tool_results=tool_results,
+                    )
+            elif pressure.level == "soft" and not self._soft_applied:
+                soft = self.recovery.apply_soft(default_recent_turns=self.builder.recent_turns)
+                self._soft_applied = True
+                events.append(
+                    self._event(
+                        "context_pressure",
+                        step_index,
+                        soft.message,
+                        data=dict(soft.context),
+                    )
+                )
+                context = self.builder.build(
+                    session_id=active_session,
+                    system=self.system,
+                    task=task,
+                    tool_results=tool_results,
+                )
+
             prompt = context.render()
             events.append(
                 self._event(
@@ -164,8 +230,24 @@ class AgentLoop:
             try:
                 reply = self.model.complete(prompt, system=self.system)
             except ModelClientError as exc:
-                status, reason = "error", str(exc)
-                break
+                # A dead page (browser crash, expired login) can be recovered;
+                # the hook says whether the call is worth another attempt.
+                if self.on_model_failure is not None and self.on_model_failure(exc):
+                    events.append(
+                        self._event(
+                            "model_recovered",
+                            step_index,
+                            "the model end was recovered; retrying the request",
+                        )
+                    )
+                    try:
+                        reply = self.model.complete(prompt, system=self.system)
+                    except ModelClientError as second:
+                        status, reason = "error", str(second)
+                        break
+                else:
+                    status, reason = "error", str(exc)
+                    break
 
             # Only model output may be parsed as instructions.
             try:

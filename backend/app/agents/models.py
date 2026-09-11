@@ -38,6 +38,9 @@ EventType = Literal[
     "blocked",
     "checkpoint",
     "loop_detected",
+    "context_pressure",
+    "context_rotated",
+    "model_recovered",
     "run_end",
 ]
 
