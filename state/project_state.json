@@ -1,35 +1,35 @@
 {
-  "current_milestone": "M2",
+  "current_milestone": "M3",
   "current_task": null,
-  "goal": "M2 — State and Context: TranscriptStore, ProjectState, MemoryStore, ContextBuilder and SessionManager with JSON persistence, so state is saved, the program can be closed and restarted, and the context for the next turn is built correctly.",
-  "milestone_status": "M2 complete, M3 not started",
+  "goal": "M3 — Tool System: ToolCall -> Parser -> Executor -> Tool Result, nine tools, a parser golden set, and structured parse errors with a bounded retry budget.",
+  "milestone_status": "M3 complete, M4 not started",
   "todos": [
     {
-      "content": "M2: typed Memory/MemoryEntry model + sessions dir config",
+      "content": "M3: tool models (ToolCall/ToolResult/ToolSpec/ParseIssue) + JSON5 subset reader",
       "status": "completed"
     },
     {
-      "content": "M2: TranscriptStore (JSONL per session, torn-line tolerant, turn grouping, extractive summary)",
+      "content": "M3: ToolCallParser (JSON/JSON5/code fence/multiple calls/bracket matching/embedded prose) with structured errors",
       "status": "completed"
     },
     {
-      "content": "M2: MemoryStore with the memory_propose review pipeline (filter/dedupe/conflict/sensitive/write)",
+      "content": "M3: ToolRegistry with published JSON schemas and risk levels",
       "status": "completed"
     },
     {
-      "content": "M2: ContextBuilder (priority order, char budget, truncation with reference, untrusted marker, summary section)",
+      "content": "M3: nine tools (list_dir/read_file/write_file/apply_patch/search/run_shell/memory_propose/update_project_state/ask_user)",
       "status": "completed"
     },
     {
-      "content": "M2: SessionManager (create/resume/rotate, bounded seed, summary + archive, corrupt-index rebuild)",
+      "content": "M3: Executor (schema validation, logging, error handling, idempotency, confirmation seam)",
       "status": "completed"
     },
     {
-      "content": "M2: tests for transcript/memory/context/session + restart-recovery acceptance",
+      "content": "M3: parser golden set + executor/tool/CLI tests",
       "status": "completed"
     },
     {
-      "content": "M2: surface the layer (read-only REST /api/sessions,/api/messages,/api/context + app.context.cli) and document it",
+      "content": "M3: app.tools.cli and the end-to-end acceptance run",
       "status": "completed"
     }
   ],
@@ -81,6 +81,20 @@
     "backend/tests/test_context_api.py",
     "backend/tests/test_context_cli.py",
     "backend/tests/test_storage.py",
+    "backend/README.md",
+    "backend/app/tools/__init__.py",
+    "backend/app/tools/models.py",
+    "backend/app/tools/errors.py",
+    "backend/app/tools/json5.py",
+    "backend/app/tools/parser.py",
+    "backend/app/tools/registry.py",
+    "backend/app/tools/builtin.py",
+    "backend/app/tools/executor.py",
+    "backend/app/tools/cli.py",
+    "backend/tests/test_tool_parser.py",
+    "backend/tests/test_tools_executor.py",
+    "backend/tests/test_tools_builtin.py",
+    "backend/tests/test_tools_cli.py",
     "backend/README.md"
   ],
   "tests": [
@@ -103,15 +117,21 @@
       "date": "2026-09-11"
     },
     {
-      "name": "backend pytest (M0 + M1 + M2)",
-      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
-      "result": "150 passed in 66.8s (M2 added 93: test_transcript_store 16, test_memory_store 22, test_context_builder 15, test_session_manager 21, test_context_api 10, test_context_cli 9)",
-      "date": "2026-09-11"
-    },
-    {
       "name": "M2 acceptance run (three real processes, outside pytest)",
       "command": "process 1: work + save state; process 2: `python -m app.context.cli resume`; process 3: rotate and rebuild context",
       "result": "PASS: process 2 recovered the session created by process 1 (recovered=True, 3 messages / 1 turn), project state M2 + todo + 1 memory entry restored, context assembled as system/task/project_state/memory/transcript; rotation archived the session, kept a seed carrying project state + task + memory, and carried 3 entries verbatim",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0 + M1 + M2 + M3)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "303 passed in 72.9s (M3 added 153: test_tool_parser 68, test_tools_executor 27, test_tools_builtin 44, test_tools_cli 14)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M3 acceptance run (real process, outside pytest)",
+      "command": "parse a messy model output (prose + json5 fence + 3 calls) -> execute through the Executor -> confirmation seam -> parse retry -> inspect log",
+      "result": "PASS: 3 calls recovered from fenced JSON5 with zero issues (read_file, apply_patch, update_project_state); all executed; the file was patched (return 1 -> return 2), the milestone advanced to M3 and files_changed recorded; run_shell refused with confirmation_required and ran once confirmed; parse failures produced invalid_json then unbalanced_brackets with the retry budget allowing 2 retries and stopping on the 3rd attempt; 5 audit log lines written",
       "date": "2026-09-11"
     }
   ],
@@ -136,7 +156,13 @@
     "Rotation only reclaims space when the session is near the budget; the seed is a fixed cost, so rotating a small session can grow the context. should_rotate() is the documented gate and the rotate CLI prints the before/after sizes plus a note instead of hiding it.",
     "M2 REST surface is read-only (/api/sessions, /api/sessions/{id}, /api/messages, /api/context) and no endpoint executes anything; the Tool layer arrives in M3 behind SafetyLayer/Executor. Named after docs/api-protocol.md, keeping /api/project_state and /api/memory.",
     "M2 memory dedupe compares VALUES only: the same key with a different value is a conflict, not a duplicate (the first implementation classified it as duplicate, which silently swallowed the conflict).",
-    "M2 skips the project_state context section entirely when the state holds nothing factual, so an unstarted project does not push placeholder lines into every turn (docs/state-context.md forbids injecting everything by default)."
+    "M2 skips the project_state context section entirely when the state holds nothing factual, so an unstarted project does not push placeholder lines into every turn (docs/state-context.md forbids injecting everything by default).",
+    "M3 does NOT implement the SafetyLayer (that is M4). The Executor only carries the seam: tools declare risk and requires_confirmation, and a confirmation-requiring tool is refused unless a confirmation or an approval hook is present. Known gap owned by M4: there is no path restriction yet, so a tool can still read an absolute path outside the project (verified), and there is no sensitive-file check.",
+    "M3 tool arguments are strict (extra='forbid'): an invented parameter is a schema violation, because silently dropping it would hide that the model misunderstood the tool.",
+    "M3 does not expose tools over REST: with no SafetyLayer yet, an HTTP entry point to run_shell/write_file would be a hole. Manual use goes through app.tools.cli, which uses the same Executor and bypasses nothing.",
+    "M3 parser reports no_tool_call (not invalid_json) when the output contains no JSON structure at all, but keeps a specific issue code when a real structure failed to parse; otherwise the model hunts a syntax error that does not exist.",
+    "M3 Executor logs replayed idempotent calls too: a replay is still a call that happened, and omitting it would make the audit log under-report (found by a test).",
+    "M3 apply_patch writes nothing unless every hunk matches exactly once, so a partially applied patch can never leave a file half-modified."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -146,9 +172,12 @@
     "A stray empty clone of the same repository sits at ./coding-agent/ (only a .git directory, no commits, no files, no stashes). It is untracked and makes 'git add -A' fail with \"'coding-agent/' does not have a commit checked out\"; it was deliberately excluded from the commit instead of being deleted.",
     "The Command Code provider patch takes effect only after a DSH restart; until then the running session keeps the unpatched adapter module.",
     "M2 is complete: backend/app/context/{models,transcript,memory,builder,session,cli}.py plus the read-only /api context routes; 150 backend tests green.",
-    "state/sessions/ holds runtime transcripts and the session index and is gitignored; the state files themselves (project_state.json, memory.json) stay tracked."
+    "state/sessions/ holds runtime transcripts and the session index and is gitignored; the state files themselves (project_state.json, memory.json) stay tracked.",
+    "M3 is complete: backend/app/tools/{models,errors,json5,parser,registry,builtin,executor,cli}.py; 303 backend tests green.",
+    "run_shell is the only tool that requires confirmation today, and the only high-risk tool; the M4 SafetyLayer will add path limits, sensitive-file checks and the confirmation UI in front of the Executor.",
+    "Tool calls are logged to runs/tool-calls.jsonl (gitignored), including replays and refusals."
   ],
-  "checkpoint": "M2 checkpoint 2026-09-11: Context/State layer complete (TranscriptStore JSONL, MemoryStore review pipeline, ContextBuilder with budget/truncation, SessionManager with bounded-seed rotation), restart recovery verified across three real processes, 150 backend tests green. Next milestone: M3 (Tool System).",
+  "checkpoint": "M3 checkpoint 2026-09-11: tool system complete (parser with golden set, registry with schemas, nine tools, executor with validation/logging/idempotency and the confirmation seam), end-to-end run verified in a real process, 303 backend tests green. Next milestone: M4 (Safety), which inserts SafetyLayer in front of the Executor.",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",

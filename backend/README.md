@@ -204,3 +204,86 @@ python -m app.context.cli rotate --reason manual
 | `GET /api/context?task=` | preview of the next turn's assembled context |
 
 Nothing in M2 writes state through the API, and no endpoint executes anything.
+---
+
+# Tool layer (M3)
+
+`app/tools/` implements the pipeline `ToolCall -> Parser -> Executor -> Tool Result`.
+
+| Module | Responsibility |
+| --- | --- |
+| `parser.py` | `ToolCallParser` — JSON, JSON5, code fences, multiple calls, bracket matching, structured errors |
+| `json5.py` | hand-written JSON5 subset reader (no dependency) |
+| `registry.py` | `ToolRegistry` — names, JSON schemas, risk levels |
+| `builtin.py` | the nine tools |
+| `executor.py` | `Executor` — the single real entry point |
+| `cli.py` | manual entry points |
+
+## Tools
+
+| Tool | Risk | Notes |
+| --- | --- | --- |
+| `list_dir` | low | idempotent; skips `.git`, `node_modules`, `.venv`, `dist`, `runs` |
+| `read_file` | low | idempotent; line ranges; rejects non-UTF-8 and files over 512 kB |
+| `write_file` | medium | idempotent; reports created vs updated and how much was replaced |
+| `apply_patch` | medium | exact-fragment replacement; refuses an ambiguous anchor and writes nothing on failure |
+| `search` | low | idempotent; regex + glob filter, bounded results |
+| `run_shell` | high | **requires confirmation**; bounded timeout and output |
+| `memory_propose` | medium | goes through the M2 review pipeline; a rejected proposal is a failed call |
+| `update_project_state` | medium | idempotent; partial update, appends without duplicating |
+| `ask_user` | low | needs a user channel; fails cleanly when there is none |
+
+## Parser
+
+Accepted packaging for one call: a bare object, an array, a `tool_calls`
+wrapper, an OpenAI-style `function` block, a fenced block (`json`/`json5`), or
+any of those embedded in prose. Argument keys may be `arguments`,
+`parameters`, `args`, `input`, and may arrive as a JSON string.
+
+Failures are **structured**, never free text: each carries a stable `code`,
+the character offset when one exists, and a `repair_hint`. Codes:
+`empty_input`, `no_tool_call`, `invalid_json`, `unbalanced_brackets`,
+`not_an_object`, `missing_name`, `missing_arguments`, `invalid_arguments`,
+`unknown_tool`, `too_many_calls`.
+
+`ParseRetryPolicy(max_attempts=3)` tracks the bounded retry budget and turns
+the latest failure into an instruction for the model (`repair_prompt`).
+
+## Executor
+
+The single real entry point. It provides what `docs/safety.md` requires of it:
+
+* **schema validation** — arguments are validated against the tool's Pydantic
+  model, and **unknown parameters are rejected** rather than ignored
+* **error handling** — nothing propagates: every failure becomes a
+  `ToolResult` with a structured `error` (including unexpected exceptions)
+* **logging** — every call, including replays, is appended to
+  `runs/tool-calls.jsonl`; a broken log path never breaks an execution
+* **idempotency** — an identical call to an idempotent tool is replayed from
+  cache and marked `idempotent_replay`
+
+### Confirmation seam (M4 fills it)
+
+M3 does **not** implement the SafetyLayer. It provides the seam: tools declare
+`risk` and `requires_confirmation`, and the Executor refuses to run a
+confirmation-requiring tool unless a confirmation or an approval hook is
+present. Today only `run_shell` requires it.
+
+**Known gap, owned by M4:** there is no path restriction yet — a tool can still
+reach an absolute path outside the project, and there is no sensitive-file
+check. M4 (`SafetyLayer`) inserts itself in front of the Executor and adds the
+confirmation UI.
+
+## CLI
+
+```bash
+cd backend
+
+python -m app.tools.cli list
+python -m app.tools.cli schema read_file
+python -m app.tools.cli parse --text "{name: 'read_file', args: {path: 'x'}}"
+python -m app.tools.cli run read_file --args '{"path": "README.md"}'
+python -m app.tools.cli run run_shell --args '{"command": "echo hi"}' --confirm
+```
+
+The CLI goes through the same Executor as the model will; it bypasses nothing.
