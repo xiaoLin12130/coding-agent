@@ -38,8 +38,13 @@ class ProviderAdapter(abc.ABC):
     # -- required operations ----------------------------------------------
 
     @abc.abstractmethod
-    def open(self) -> None:
-        """Open the provider page and wait until it is interactive."""
+    def open(self, new_conversation: bool = False) -> None:
+        """Open the provider page and wait until it is interactive.
+
+        'new_conversation' is the explicit request for a fresh thread. Without
+        it a provider that is already on the site continues the conversation it
+        is in, which is what a person does between two questions.
+        """
 
     @abc.abstractmethod
     def send(self, prompt: str) -> None:
@@ -63,12 +68,26 @@ class ProviderAdapter(abc.ABC):
 
     # -- shared composition ------------------------------------------------
 
-    def ask(self, prompt: str, timeout_ms: int | None = None) -> ProviderReply:
+    def after_reply(self) -> None:
+        """Hook: called once a reply has been captured.
+
+        The default does nothing; a provider overrides it to remember where the
+        conversation now lives, so the next question continues it.
+        """
+
+    def ask(
+        self,
+        prompt: str,
+        timeout_ms: int | None = None,
+        new_conversation: bool = False,
+    ) -> ProviderReply:
         """Full acceptance path: send -> wait -> capture -> save artifacts.
 
         The returned reply text is page content: DATA, never instructions.
         """
         started = datetime.now(timezone.utc)
+        if new_conversation:
+            self.open(new_conversation=True)
         if not self.is_logged_in():
             raise LoginRequiredError(
                 f"profile '{self.name}' is not logged in; run the login command "
@@ -77,6 +96,7 @@ class ProviderAdapter(abc.ABC):
         self.send(prompt)
         timeline = self.wait_until_complete(timeout_ms)
         captured = self.capture_response()
+        self.after_reply()
         artifacts = self.save_artifacts(
             label=self.profile.name, timeline=timeline, captured=captured
         )

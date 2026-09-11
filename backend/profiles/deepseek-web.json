@@ -1,0 +1,56 @@
+{
+  "name": "deepseek-web",
+  "description": "Chat with the DeepSeek web app (chat.deepseek.com). Selectors were read off a real DOM dump from this machine; the session lives in the persistent browser profile, so login happens once, by hand.",
+  "url": "https://chat.deepseek.com/",
+  "verified": false,
+  "notes": "Selectors confirmed against a live page on 2026-09-11: the composer is a <textarea>, the assistant answer body is div.ds-assistant-message-main-content. No stop control was found in the captured DOM, so completion is detected by DOM text stability instead of the stop button disappearing; raise stable_polls before lowering completion.timeout_ms. Login, captcha and risk-control flows are never automated (project rule) - sign in manually in the headed window. The page is driven the way a person drives it (mouse movement, per-character typing with a variable rhythm, pauses); no fingerprint or stealth handling is involved. An open conversation is REUSED by default - pass --new-conversation for a fresh thread. 深度思考 (thinking mode) is switched on before each message by the profile's toggles; its ON marker is aria-pressed='true' on div.ds-toggle-button.",
+  "ready_selector": "textarea",
+  "input_selector": "textarea",
+  "send_button_selector": null,
+  "send_key": "Enter",
+  "stop_button_selector": null,
+  "assistant_message_selector": "div.ds-assistant-message-main-content",
+  "copy_button_selector": null,
+  "copy_status_selector": null,
+  "login_required_selector": null,
+  "login_indicator_selector": "textarea",
+  "network_response_patterns": [],
+  "network_text_path": "delta",
+  "completion": {
+    "timeout_ms": 180000,
+    "start_timeout_ms": 30000,
+    "poll_interval_ms": 500,
+    "stable_polls": 6,
+    "min_wait_ms": 1000
+  },
+  "human": {
+    "enabled": true,
+    "typing_min_ms": 18,
+    "typing_fast_max_ms": 55,
+    "typing_slow_min_ms": 95,
+    "typing_max_ms": 190,
+    "typing_fast_chance": 0.72,
+    "key_pause_chance": 0.08,
+    "key_pause_min_ms": 150,
+    "key_pause_max_ms": 520,
+    "mouse_steps": 14,
+    "mouse_max_ms": 90,
+    "click_hold_ms": 70,
+    "think_min_ms": 250,
+    "think_max_ms": 900,
+    "pre_send_min_ms": 180,
+    "pre_send_max_ms": 600,
+    "settle_min_ms": 200,
+    "settle_max_ms": 600
+  },
+  "reuse_conversation": true,
+  "toggles": [
+    {
+      "name": "深度思考",
+      "selector": "div.ds-toggle-button:has-text('深度思考')",
+      "active_selector": "div.ds-toggle-button[aria-pressed='true']:has-text('深度思考')",
+      "enabled": true,
+      "description": "DeepSeek's thinking mode. Switched ON before every message: the page keeps whatever the last session left behind, and the agent wants the model's reasoning rather than a quick guess."
+    }
+  ]
+}

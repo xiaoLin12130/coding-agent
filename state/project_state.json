@@ -1,35 +1,35 @@
 {
-  "current_milestone": "M9",
+  "current_milestone": "M10",
   "current_task": null,
-  "goal": "M9 — Evaluation and Multi-Provider: a golden parser set and an agent evaluation over the six required dimensions, gated by thresholds, plus a provider registry so a new provider never changes the AgentLoop.",
-  "milestone_status": "M9 complete",
+  "goal": "M10 — Human-like interaction and session reuse: drive a real web LLM the way a person does (pointer, clicks, mixed-speed typing, pauses), keep ONE conversation for a whole run instead of one per question, and switch the site's thinking mode on by default.",
+  "milestone_status": "M10 complete (M0..M10 all complete)",
   "todos": [
     {
-      "content": "M9: provider registry + adapters (browser / scripted / openai-compatible) behind ModelClient",
+      "content": "M10: HumanActor (segmented pointer move, click, clear draft, per-character typing, pauses)",
       "status": "completed"
     },
     {
-      "content": "M9: provider selection through the settings document (+ catalog, secret options, cache reset)",
+      "content": "M10: HumanPolicy with a FAST band and a SLOW band, randomised, injectable RNG",
       "status": "completed"
     },
     {
-      "content": "M9: provider CLI (list / show / check) and tests, including the loop running unchanged over every provider",
+      "content": "M10: conversation reuse in WebChatProvider.open (navigate only when new_conversation=True)",
       "status": "completed"
     },
     {
-      "content": "M9: golden parser set (50 cases over the eight categories required by docs/testing.md)",
+      "content": "M10: PreSendToggle + apply_toggles, thinking mode on by default in the DeepSeek profile",
       "status": "completed"
     },
     {
-      "content": "M9: agent scenarios (15 cases over the six dimensions) with fault injection and real components",
+      "content": "M10: offline tests for rhythm, pointer, toggles and reuse (43 new)",
       "status": "completed"
     },
     {
-      "content": "M9: thresholds, markdown/JSON report and evaluation CLI",
+      "content": "M10: real-environment verification against chat.deepseek.com (two questions, one conversation)",
       "status": "completed"
     },
     {
-      "content": "M9: regression gate test + full backend/frontend verification",
+      "content": "M10: docs (milestones/M10.md, docs/browser.md, docs/testing.md, backend/README.md)",
       "status": "completed"
     }
   ],
@@ -177,7 +177,14 @@
     "backend/tests/test_evaluation_regression.py",
     "backend/tests/test_ws.py",
     "docs/testing.md",
-    "backend/tests/manual/live_console_check.py"
+    "backend/tests/manual/live_console_check.py",
+    "backend/app/browser/human.py",
+    "backend/profiles/deepseek-web.json",
+    "backend/tests/test_browser_human.py",
+    "backend/tests/manual/live_deepseek_check.py",
+    "backend/tests/manual/live_browser_agent_check.py",
+    "milestones/M10.md",
+    "docs/browser.md"
   ],
   "tests": [
     {
@@ -293,6 +300,30 @@
       "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/live_console_check.py",
       "result": "PASS: /api/settings served adapter=scripted with the 3-provider catalog; a run started from the scripted plan reached a real Chromium WebSocket as message, agent_update*, assistant_delta, tool_call, tool_result, state_update, assistant_delta, agent_update, done - the terminal 'done' frame the M8 mapping never delivered",
       "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M10), whole suite in one run",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "883 passed in 248s (M10 added 43: test_browser_human covers rhythm, pointer, toggles, reuse)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M10 live check against chat.deepseek.com (real browser, real model)",
+      "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/live_deepseek_check.py",
+      "result": "PASS: thinking mode switched on (toggles_on=['深度思考']); two questions in ONE conversation (second open reused the page: url unchanged, reused=True); typing rhythm mixed 19 fast / 8 slow characters in the 18-55 / 95-190 ms bands; both replies ('E2E-ONE', 'E2E-TWO') captured, ~11s each",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M10 live full-stack agent check against chat.deepseek.com",
+      "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/live_browser_agent_check.py",
+      "result": "PASS: /api/settings served adapter=browser (profile deepseek-web); the real model called read_file (tool_results [('read_file', True)]), got the result back and completed in 2 steps; the page held both answers of the run, proving the whole run stayed in one conversation; the scratch file was not modified",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "frontend + evaluation re-run after M10 (unchanged by the browser work)",
+      "command": "cd frontend && npx tsc --noEmit && npm test ; cd backend && python -m app.evaluation.cli run",
+      "result": "0 type errors, 66 frontend tests passed; evaluation PASS (parser 50/50, agent 15/15)",
+      "date": "2026-09-11"
     }
   ],
   "failures": [
@@ -373,7 +404,14 @@
     "The evaluation harness runs the REAL components (parser, SafetyLayer, Executor, AgentLoop, SessionManager) in a throwaway workspace per case; only the model is scripted, and the recovery cases break it on purpose first (fault injection), so 'recovery' is demonstrated rather than assumed.",
     "A case carries its contract, and the harness reports the difference; it never rewrites the expectation to match the implementation. Observed behaviour that is a genuine limitation is recorded in a known_gap field whose expectation still describes today's behaviour, and the regression test asserts that gap is unchanged - so fixing one forces a dataset update in the same change.",
     "Thresholds require 100% of both suites plus coverage of the eight parser categories, the six dimensions and the case counts, so a regression fails the suite instead of quietly lowering a number. A suite that did not run is absent (None) rather than an empty report, because an empty report reads as 'ran and found nothing'.",
-    "M9 evaluated the agent, it did not re-implement it: the three parser limitations the golden set exposed are recorded and left to a future change, because fixing M3 parse behaviour is not this milestone's task."
+    "M9 evaluated the agent, it did not re-implement it: the three parser limitations the golden set exposed are recorded and left to a future change, because fixing M3 parse behaviour is not this milestone's task.",
+    "M10 typing rhythm is a MIXTURE of two bands (fast 18-55 ms with probability 0.72, slow 95-190 ms otherwise), not one uniform range: a flat range around a single average is the one rhythm a person never produces. Tests assert the mixture (most characters fast, some slow), not just the bounds.",
+    "HumanActor takes an injectable RNG and the policy is data, so every timing rule is asserted offline with no real waiting; the same code path is what runs against the real page.",
+    "Human-like driving is PACING, not camouflage: it moves the pointer, clicks, clears the draft and types character by character. It does not touch the user agent, fingerprints, captchas or risk control, which the project forbids.",
+    "open() reuses the conversation by default and only navigates on an explicit new_conversation=True; the conversation URL is remembered after every reply, so a page that drifted away returns to the SAME chat rather than to the site root. A person asking a second question types into the thread they are already in.",
+    "A profile declares the site switches that must be ON (PreSendToggle). The ON marker is checked, the control is clicked when the marker is missing, and a click that never produces the marker RAISES instead of being reported as success - a silently failed switch would otherwise show up as a worse answer, not as an error.",
+    "DeepSeek thinking mode (深度思考) is on by default in the shipped profile, because the agent wants the model's reasoning rather than a quick guess; the page keeps whatever the last human session left behind, so 'the toggle exists' is not 'the mode is on'.",
+    "Manual live checks are kept out of pytest (they bind ports, open a headed browser and talk to a real site); they exist so 'it works offline' can be separated from 'it works against a real web LLM'."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -408,9 +446,13 @@
     "Evaluation is fully offline: no browser, no network and no real model are involved, so it runs in about 4 seconds and can gate every change.",
     "M8 + M9 are committed as c36b8c3 (105 files). state/checkpoints/ is now gitignored: 2771 checkpoint files from earlier runs had been picked up by 'git add' and are runtime data, like state/sessions/.",
     "The live console check (backend/tests/manual/live_console_check.py) is kept out of the pytest suite on purpose: it binds two ports and launches Chromium. It is the only check that proves provider selection AND the terminal done frame against a real server instead of the ASGI test client.",
-    "The check drives the SCRIPTED provider, so a full console run - provider selection, REST, WebSocket and the tool chain - can be exercised end to end with no web LLM, no login and no network."
+    "The check drives the SCRIPTED provider, so a full console run - provider selection, REST, WebSocket and the tool chain - can be exercised end to end with no web LLM, no login and no network.",
+    "M10 verified against the real site: chat.deepseek.com drives correctly with the deepseek-web profile (composer is a textarea, the answer body is div.ds-assistant-message-main-content, the thinking switch is div.ds-toggle-button with aria-pressed).",
+    "Real web LLM behaviour observed while testing: with thinking mode OFF the model twice answered WITHOUT calling the tool (it replied from the function name, once claiming add sums when the file subtracts); with thinking ON it called read_file. Prompt compliance from a web chat page is not guaranteed, which is why the parser is forgiving and the live check asserts a real tool call.",
+    "The off switch for human pacing is profile-level (human.enabled=false) and is used by pages where instant input is correct; the shipped mock profile keeps it ON with a 1-4 ms rhythm so the suite still exercises the human path.",
+    "runs/ now holds live-check artifacts from real DeepSeek sessions (screenshots, DOM dumps, timelines); they are gitignored like every other run artifact."
   ],
-  "checkpoint": "M9 checkpoint 2026-09-11: provider registry with three adapters (browser, offline scripted, OpenAI-compatible HTTP) selectable from the settings document without touching the AgentLoop; golden parser set of 50 cases over the eight required categories; 15 agent scenarios over the six required dimensions running the real stack with fault injection; thresholds, markdown/JSON report and an evaluation CLI; regression gate in pytest. 840 backend tests (800 non-browser + 40 browser) and 66 frontend tests green. A real M8 defect (the WebSocket never delivered 'done' or 'error') was found and fixed along the way. Project milestone list is now complete: M0..M9.",
+  "checkpoint": "M10 checkpoint 2026-09-11: the browser layer drives a real web LLM the way a person does - segmented pointer movement, a click, draft clearing, per-character typing with a fast/slow rhythm, pauses before send and after the reply - and keeps ONE conversation for a whole run instead of one per question, with the site's thinking mode switched on by default and its ON marker verified. 883 backend tests and 66 frontend tests green; evaluation still PASS. Verified live against chat.deepseek.com both at the provider level (two questions, same chat) and through the whole stack (settings -> browser provider -> AgentLoop -> read_file -> answer). Previous milestone in this commit: 2701b53.",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",

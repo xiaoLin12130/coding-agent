@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 ReplySource = Literal["network", "clipboard", "dom"]
 
@@ -39,6 +39,84 @@ class CompletionPolicy(BaseModel):
     poll_interval_ms: int = Field(default=250, gt=0)
     stable_polls: int = Field(default=3, ge=1)
     min_wait_ms: int = Field(default=300, ge=0)
+
+
+class HumanPolicy(BaseModel):
+    """How the browser acts on the page: like a person, not like a script.
+
+    Delays are ranges, not fixed values, and they are deliberately short by
+    default: this is pacing, not camouflage. Set 'enabled: false' for a page
+    where instant input is correct (the offline fixture, a local test page).
+
+    Nothing here disguises the browser: no user-agent rewriting, no fingerprint
+    patching, no captcha or risk-control handling (project rule).
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    enabled: bool = True
+    # Typing rhythm: a FAST band and a SLOW band, not one flat range. People
+    # type in bursts - most characters in well under a tenth of a second, a few
+    # much slower - so 'typing_fast_chance' of the characters draw from the fast
+    # band and the rest from the slow one.
+    typing_min_ms: int = Field(default=18, ge=0, le=2_000)
+    typing_fast_max_ms: int = Field(default=55, ge=0, le=2_000)
+    typing_slow_min_ms: int = Field(default=95, ge=0, le=2_000)
+    typing_max_ms: int = Field(default=190, ge=0, le=2_000)
+    typing_fast_chance: float = Field(default=0.72, ge=0, le=1)
+    key_pause_chance: float = Field(default=0.08, ge=0, le=1)
+    key_pause_min_ms: int = Field(default=120, ge=0, le=5_000)
+    key_pause_max_ms: int = Field(default=420, ge=0, le=5_000)
+    pause_characters: list[str] = Field(
+        default_factory=lambda: [" ", ",", ".", ";", ":", "\n", "，", "。", "！", "？"]
+    )
+    # Pointer behaviour.
+    mouse_steps: int = Field(default=12, ge=1, le=100)
+    mouse_max_ms: int = Field(default=90, ge=0, le=2_000)
+    click_hold_ms: int = Field(default=60, ge=0, le=2_000)
+    # The pause before typing, between text and Enter, and after a reply.
+    think_min_ms: int = Field(default=150, ge=0, le=10_000)
+    think_max_ms: int = Field(default=600, ge=0, le=10_000)
+    pre_send_min_ms: int = Field(default=120, ge=0, le=10_000)
+    pre_send_max_ms: int = Field(default=450, ge=0, le=10_000)
+    settle_min_ms: int = Field(default=100, ge=0, le=10_000)
+    settle_max_ms: int = Field(default=400, ge=0, le=10_000)
+    select_all_key: str = "Control+a"
+
+    @model_validator(mode="after")
+    def _ranges_are_ordered(self) -> "HumanPolicy":
+        for low, high in (
+            ("typing_min_ms", "typing_fast_max_ms"),
+            ("typing_fast_max_ms", "typing_slow_min_ms"),
+            ("typing_slow_min_ms", "typing_max_ms"),
+            ("key_pause_min_ms", "key_pause_max_ms"),
+            ("think_min_ms", "think_max_ms"),
+            ("pre_send_min_ms", "pre_send_max_ms"),
+            ("settle_min_ms", "settle_max_ms"),
+        ):
+            if getattr(self, low) > getattr(self, high):
+                raise ValueError(low + " must not exceed " + high)
+        return self
+
+
+class PreSendToggle(BaseModel):
+    """A page switch that must be ON before a message is sent.
+
+    The first one is a site's thinking/reasoning mode: the project wants the
+    model's reasoning, so it is switched on by default rather than left to
+    whatever the last human session left behind.
+
+    'active_selector' is the CSS that is present only while the switch is ON;
+    when it is empty the toggle is clicked whenever it is visible.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str
+    selector: str
+    active_selector: str = ""
+    enabled: bool = True
+    description: str = ""
 
 
 class ProviderProfile(BaseModel):
@@ -73,6 +151,15 @@ class ProviderProfile(BaseModel):
     network_content_types: list[str] = Field(
         default_factory=lambda: ["text/event-stream", "application/json"]
     )
+
+    # How the page is driven (typing rhythm, pointer movement). M10.
+    human: HumanPolicy = Field(default_factory=HumanPolicy)
+    # Switches turned ON before a message is sent (a site's thinking mode).
+    toggles: list[PreSendToggle] = Field(default_factory=list)
+    # Reuse the conversation already open in this browser instead of navigating
+    # to the site again, which is what a person does: they continue the thread
+    # they are in rather than starting a new one for every question.
+    reuse_conversation: bool = True
 
     completion: CompletionPolicy = Field(default_factory=CompletionPolicy)
 

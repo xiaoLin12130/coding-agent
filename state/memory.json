@@ -41,6 +41,12 @@
       "value": "Model providers are adapters in backend/app/providers (browser | scripted | openai_compatible) selected by provider.adapter in state/settings.json; the AgentLoop only ever sees a ModelClient, so a new provider is an adapter plus a registration. Secret options never persist (they come from the environment). Inspect with 'python -m app.providers.cli list|show|check'.",
       "source": "M9 multi-provider",
       "updated_at": "2026-09-11"
+    },
+    {
+      "key": "env.deepseek-web-profile",
+      "value": "Real web LLM testing happens through the shipped profile deepseek-web (chat.deepseek.com): composer = textarea, answer body = div.ds-assistant-message-main-content, thinking switch = div.ds-toggle-button with aria-pressed='true' when ON (switched on automatically). The logged-in session lives in the repo's .browser-profile, so log in once by hand with 'python -m app.browser.cli login --profile deepseek-web'. Manual checks: tests/manual/live_deepseek_check.py (two questions, one conversation) and tests/manual/live_browser_agent_check.py (whole stack, real tool call).",
+      "source": "M10 real-environment testing",
+      "updated_at": "2026-09-11"
     }
   ]
 }

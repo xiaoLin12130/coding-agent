@@ -834,6 +834,91 @@ no entry for the runtime's `done` and `error` events, so every run ended as an
 covered it waited forever for a frame that could not arrive. Both names are
 mapped now (`app/api/ws.py`) and guarded by tests.
 
+---
+
+# Human-like interaction and session reuse (M10)
+
+A real web LLM is not a local fixture: how the page is driven matters, and so
+does whether the second question continues the first conversation.
+
+| Module | Responsibility |
+| --- | --- |
+| `app/browser/human.py` | `HumanActor` — move, click, clear, type with a rhythm, pause |
+| `app/browser/models.py` | `HumanPolicy` (the rhythm), `PreSendToggle` (a switch that must be ON) |
+| `app/browser/web_chat.py` | applies both: `compose()` per message, `apply_toggles()` on open, conversation reuse |
+
+## The page is driven like a person drives it
+
+```
+mouse travels to the composer (segmented, not teleported)
+  -> click
+  -> clear the draft (Ctrl+A, Backspace)
+  -> type character by character
+  -> pause
+  -> Enter
+```
+
+The rhythm is a **mixture of two bands**, not one flat range: most characters
+come from the fast band and the rest from the slow one, so a 40-character
+question is not typed at a metronome's pace.
+
+```jsonc
+"human": {
+  "enabled": true,
+  "typing_min_ms": 18,       // fastest character
+  "typing_fast_max_ms": 55,  // end of the fast band
+  "typing_slow_min_ms": 95,  // start of the slow band
+  "typing_max_ms": 190,      // slowest character
+  "typing_fast_chance": 0.72 // 72% of characters are typed fast
+}
+```
+
+Every delay has an injectable RNG, so the offline tests assert the rhythm
+exactly instead of sleeping. `enabled: false` turns the actor back into a plain
+`fill` for a page where instant input is correct.
+
+This is pacing, not camouflage: no user-agent rewriting, no fingerprint
+patching, no captcha or risk-control handling (project rule).
+
+## One conversation, not one per question
+
+A person asking a second question types into the thread they are already in, so
+`open()` **reuses the conversation** by default:
+
+* the page is already on this site and the composer is usable -> keep it;
+* the page drifted elsewhere -> navigate back to the remembered conversation
+  URL, not to the site root;
+* `open(new_conversation=True)` (CLI: `--new-conversation`) is the explicit
+  fresh start.
+
+## A switch that must be ON
+
+A profile can declare switches that are turned on before every message:
+
+```jsonc
+"toggles": [
+  {
+    "name": "深度思考",
+    "selector": "div.ds-toggle-button:has-text('深度思考')",
+    "active_selector": "div.ds-toggle-button[aria-pressed='true']:has-text('深度思考')",
+    "enabled": true
+  }
+]
+```
+
+A page keeps whatever the last session left behind, so the toggle existing is
+not the same as the mode being on: the ON marker is checked, the control is
+clicked when the marker is missing, and a click that does not produce the marker
+raises instead of pretending to have worked. The DeepSeek profile ships with
+thinking mode on by default.
+
+## Shipped profiles
+
+| Profile | What it drives |
+| --- | --- |
+| `mock` | the offline fixture page (verified; fast humanized typing) |
+| `deepseek-web` | chat.deepseek.com — composer `textarea`, answer body `div.ds-assistant-message-main-content`, 深度思考 on by default |
+
 `tests/manual/live_console_check.py` is the one check the offline suite cannot
 make: it starts a real `uvicorn` process, selects the **scripted** provider
 through the settings document and watches a run reach a real browser WebSocket,
@@ -843,3 +928,14 @@ a browser); run it by hand:
 ```bash
 cd backend && ../.venv/Scripts/python.exe tests/manual/live_console_check.py
 ```
+
+Two further manual checks talk to a REAL web LLM and are kept out of the suite
+for the same reason (a headed browser, a real site, minutes not milliseconds):
+
+| Script | What it proves |
+| --- | --- |
+| `tests/manual/live_deepseek_check.py` | the provider really drives chat.deepseek.com: thinking mode switched on, two questions with a mixed typing rhythm, the second continuing the SAME conversation |
+| `tests/manual/live_browser_agent_check.py` | the whole stack against the real site: settings choose the browser provider, the real model calls `read_file`, the tool result goes back to it, and the run ends in one conversation |
+
+Both need a logged-in `.browser-profile` (log in by hand once with
+`python -m app.browser.cli login --profile deepseek-web`).

@@ -120,3 +120,23 @@ python -m app.evaluation.cli run --json
 - 已知缺陷写入用例的 `known_gap`：期望仍然描述当前行为，报告单独列出，
   修好后必须同步修改数据集。
 - 评估全程离线，不需要浏览器、网络或真实模型。
+
+## 拟人化与会话复用（M10）
+
+单元测试（离线，注入 RNG，不真实等待）：
+
+```
+tests/test_browser_human.py
+  打字节奏：快带 / 慢带混合、范围可配置、词边界额外停顿
+  指针：分段移动、点击、清空草稿
+  开关：未开启则点击、已开启不点击、点击后未生效则报错
+  会话：首次导航、第二次复用、漂移后回到同一会话、显式开新会话
+```
+
+真机验证（手动，需已登录的浏览器 profile）：
+
+```
+tests/manual/live_deepseek_check.py        两个问题，同一会话；深度思考已打开
+tests/manual/live_browser_agent_check.py   真实模型调用工具，整轮同一会话
+tests/manual/live_console_check.py         真实 uvicorn + 浏览器 WebSocket
+```

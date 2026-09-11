@@ -17,12 +17,14 @@ never executed or treated as an instruction.
 from __future__ import annotations
 
 import json
+import re
 import time
 from datetime import datetime, timezone
 from typing import Any
 
 from .driver import BrowserDriver
 from .errors import LoginRequiredError, ProviderError
+from .human import HumanActor
 from .models import CapturedResponse, CapturedText, CompletionTimeline
 from .provider import ProviderAdapter
 
@@ -42,17 +44,108 @@ class WebChatProvider(ProviderAdapter):
         # Network responses seen before the current send: capture uses it so a
         # later question never re-reads an earlier answer's stream.
         self._capture_since = 0
+        # The page is driven the way a person drives it (typing rhythm, pointer
+        # movement, pauses), see app/browser/human.py.
+        self.human = HumanActor(driver.page, profile.human)
+        # Where the conversation lives, so a later question continues it.
+        self._conversation_url: str | None = None
+        self.reused_conversation = False
+        # Which default modes this provider has switched on (see apply_toggles).
+        self.toggles_on: list[str] = []
 
     # -- required operations ----------------------------------------------
 
-    def open(self) -> None:
-        self.driver.navigate(self.profile.url)
+    def open(self, new_conversation: bool = False) -> None:
+        """Open the page, or continue the conversation already open.
+
+        A person asking a second question does not start a new chat: they type
+        into the thread they are in. So the default is to REUSE the page when it
+        is already on this site with a usable composer, and to navigate back to
+        the remembered conversation URL when the page drifted somewhere else.
+
+        'new_conversation=True' is the deliberate fresh start, and is what a
+        caller asks for when it wants one.
+        """
         selector = self.profile.ready_selector or self.profile.input_selector
+        if not new_conversation and self._can_reuse(selector):
+            self.reused_conversation = True
+            self._remember()
+            self.apply_toggles()
+            return
+        target = self._target_url(new_conversation)
+        self.driver.navigate(target)
         if not self.driver.wait_for_selector(selector):
             raise ProviderError(
-                f"page never became ready: '{selector}' not visible at "
-                f"{self.profile.url}"
+                f"page never became ready: '{selector}' not visible at " + target
             )
+        self.reused_conversation = False
+        self._remember()
+        self.apply_toggles()
+
+    # -- default modes -----------------------------------------------------
+
+    def apply_toggles(self) -> list[str]:
+        """Switch on the profile's pre-send modes (a site's thinking mode).
+
+        A page remembers whatever the last person left behind, so 'the toggle
+        exists' is not the same as 'the mode is on'. This checks the ON marker
+        and clicks the control when it is missing, then waits for the marker to
+        appear so a silent click failure is not mistaken for success.
+        """
+        applied: list[str] = []
+        for toggle in self.profile.toggles:
+            if not toggle.enabled:
+                continue
+            if not self.driver.is_visible(toggle.selector):
+                continue
+            if toggle.active_selector and self.driver.is_visible(toggle.active_selector):
+                continue
+            page = self.driver.page
+            if not self.human.click(page.locator(toggle.selector).last):
+                raise ProviderError(
+                    "could not switch on '" + toggle.name + "' (" + toggle.selector + ")"
+                )
+            if toggle.active_selector and not self.driver.wait_for_selector(
+                toggle.active_selector, timeout_ms=5_000
+            ):
+                raise ProviderError(
+                    "'" + toggle.name + "' did not report itself as on after the click"
+                )
+            applied.append(toggle.name)
+        self.toggles_on = sorted(set(self.toggles_on) | set(applied))
+        return applied
+
+    # -- conversation continuity ------------------------------------------
+
+    @staticmethod
+    def _origin(url: str) -> str:
+        match = re.match(r"^([a-zA-Z][a-zA-Z0-9+.-]*://[^/]+)", url or "")
+        return match.group(1).lower() if match else ""
+
+    def _can_reuse(self, selector: str) -> bool:
+        """True when the open page is this site and already usable."""
+        if not self.profile.reuse_conversation:
+            return False
+        current = self.driver.page_url() or ""
+        wanted = self._origin(self.profile.url)
+        if not wanted or self._origin(current) != wanted:
+            return False
+        return self.driver.is_visible(selector)
+
+    def _target_url(self, new_conversation: bool) -> str:
+        if new_conversation or not self.profile.reuse_conversation:
+            return self.profile.url
+        return self._conversation_url or self.profile.url
+
+    def _remember(self) -> None:
+        url = self.driver.page_url() or ""
+        if url:
+            self._conversation_url = url
+
+    def after_reply(self) -> None:
+        """Remember where the conversation ended up, and let the page settle."""
+        self._remember()
+        self.human.settle()
 
     def is_logged_in(self) -> bool:
         if self.driver.is_visible(self.profile.login_required_selector):
@@ -102,12 +195,13 @@ class WebChatProvider(ProviderAdapter):
         self._capture_since = self.driver.network_cursor()
         try:
             composer = page.locator(self.profile.input_selector).last
-            composer.click()
-            composer.fill(text)
+            # Move to the composer, click it, clear the draft, type the message
+            # (app/browser/human.py); with the policy disabled this is one fill.
+            self.human.compose(composer, text)
             if self.profile.send_button_selector:
-                page.locator(self.profile.send_button_selector).last.click()
+                self.human.click(page.locator(self.profile.send_button_selector).last)
             else:
-                composer.press(self.profile.send_key)
+                self.human.press_key(composer, self.profile.send_key)
         except Exception as exc:
             raise ProviderError(f"could not send the prompt: {exc}") from exc
 
@@ -301,7 +395,8 @@ class WebChatProvider(ProviderAdapter):
         except Exception:
             pass
         try:
-            if not self.driver.click_last(selector):
+            target = page.locator(selector).last
+            if not self.human.click(target):
                 return ""
             if self.profile.copy_status_selector:
                 self.driver.wait_for_selector(

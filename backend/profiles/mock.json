@@ -3,7 +3,7 @@
   "description": "Deterministic local chat page used by the test suite and for an offline demo of the full M1 acceptance path.",
   "url": "http://127.0.0.1:8765/",
   "verified": true,
-  "notes": "Served by 'python -m fixtures.chat_site.server --port 8765' from backend/. Not a real LLM.",
+  "notes": "Served by 'python -m fixtures.chat_site.server --port 8765' from backend/. Not a real LLM. Typing is humanized but fast (2-6 ms per character), so the suite stays quick while still exercising the human path. Typing is humanized but fast (1-4 ms per character), so the suite stays quick while still exercising the human path.",
   "ready_selector": "#composer",
   "input_selector": "#composer",
   "send_button_selector": "#send",
@@ -24,5 +24,27 @@
     "poll_interval_ms": 250,
     "stable_polls": 3,
     "min_wait_ms": 300
-  }
+  },
+  "human": {
+    "enabled": true,
+    "typing_min_ms": 1,
+    "typing_fast_max_ms": 2,
+    "typing_slow_min_ms": 3,
+    "typing_max_ms": 4,
+    "typing_fast_chance": 0.5,
+    "key_pause_chance": 0,
+    "key_pause_min_ms": 0,
+    "key_pause_max_ms": 0,
+    "mouse_steps": 3,
+    "mouse_max_ms": 0,
+    "click_hold_ms": 0,
+    "think_min_ms": 0,
+    "think_max_ms": 0,
+    "pre_send_min_ms": 0,
+    "pre_send_max_ms": 1,
+    "settle_min_ms": 0,
+    "settle_max_ms": 0
+  },
+  "reuse_conversation": true,
+  "toggles": []
 }

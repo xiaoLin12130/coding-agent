@@ -77,12 +77,15 @@ def _cmd_fixture(args: argparse.Namespace) -> int:
 def _cmd_inspect(args: argparse.Namespace) -> int:
     driver, provider = _build_provider(args)
     try:
-        provider.open()
+        provider.open(new_conversation=getattr(args, "new_conversation", False))
         snapshot = driver.dom_snapshot(label=f"{provider.name}-inspect")
         screenshot = driver.screenshot(label=f"{provider.name}-inspect")
         payload = {
             "run_dir": str(driver.artifacts.run_dir),
             "logged_in": provider.is_logged_in(),
+            "reused_conversation": provider.reused_conversation,
+            "toggles_on": provider.toggles_on,
+            "human": provider.human.summary(),
             "url": snapshot.url,
             "title": snapshot.title,
             "html_path": snapshot.html_path,
@@ -109,12 +112,19 @@ def _cmd_login(args: argparse.Namespace) -> int:
 def _cmd_ask(args: argparse.Namespace) -> int:
     driver, provider = _build_provider(args)
     try:
-        provider.open()
+        provider.open(new_conversation=getattr(args, "new_conversation", False))
         reply = provider.ask(args.prompt, timeout_ms=args.timeout * 1000)
         payload = reply.model_dump(mode="json")
+        payload["reused_conversation"] = provider.reused_conversation
+        payload["toggles_on"] = provider.toggles_on
+        payload["human"] = provider.human.summary()
         if args.json:
             print(json.dumps(payload, indent=2, ensure_ascii=False))
         else:
+            print(f"human    : {'yes' if provider.human.policy.enabled else 'no'} "
+                  f"({provider.human.summary()['actions']})")
+            print(f"reused   : {provider.reused_conversation}")
+            print(f"toggles  : {provider.toggles_on or '(none)'}")
             print(f"source   : {reply.source}")
             print(f"completed: {reply.completed} (timed_out={reply.timed_out})")
             print(f"reply    : {reply.text}")
@@ -145,6 +155,11 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_inspect = sub.add_parser("inspect", help="open a profile and dump the DOM")
     _add_common(p_inspect)
+    p_inspect.add_argument(
+        "--new-conversation",
+        action="store_true",
+        help="start a fresh conversation instead of reusing the open one",
+    )
     p_inspect.set_defaults(func=_cmd_inspect)
 
     p_login = sub.add_parser("login", help="open a profile and wait for a manual login")
@@ -152,10 +167,18 @@ def build_parser() -> argparse.ArgumentParser:
     p_login.add_argument("--timeout", type=int, default=300, help="seconds to wait")
     p_login.set_defaults(func=_cmd_login)
 
-    p_ask = sub.add_parser("ask", help="send a prompt and capture the reply")
+    p_ask = sub.add_parser(
+        "ask",
+        help="send a prompt and capture the reply (reuses the open conversation)",
+    )
     _add_common(p_ask)
     p_ask.add_argument("--prompt", required=True)
     p_ask.add_argument("--timeout", type=int, default=120, help="seconds to wait")
+    p_ask.add_argument(
+        "--new-conversation",
+        action="store_true",
+        help="start a fresh conversation instead of continuing the open one",
+    )
     p_ask.set_defaults(func=_cmd_ask)
 
     return parser
