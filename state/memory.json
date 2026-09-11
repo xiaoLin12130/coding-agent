@@ -20,14 +20,26 @@
     },
     {
       "key": "env.backend-test-suite",
-      "value": "The backend suite is 'cd backend && ../.venv/Scripts/python.exe -m pytest' (57 tests, ~64s). It launches a real headed Chromium for the browser tests, and pytest's summary line only appears when output is redirected to a file rather than piped to grep.",
-      "source": "M1 setup",
+      "value": "The backend suite is 'cd backend && ../.venv/Scripts/python.exe -m pytest' (840 tests, ~225s; the browser files launch a real headed Chromium). Split it when a single command must stay short: the four browser files (test_browser_driver, test_web_chat_provider, test_agent_browser_integration, test_recovery_browser) take ~107s, everything else ~116s. pytest's summary line only survives when output is redirected to a file rather than piped to grep.",
+      "source": "M1 setup, revised in M9",
       "updated_at": "2026-09-11"
     },
     {
       "key": "repo.remote",
       "value": "The project is tracked at https://github.com/xiaoLin12130/coding-agent.git on branch main. Push with 'git push origin main' (Windows git 2.54 with Git Credential Manager 2.7.3, stored account xiaoLin12130). A stray empty clone of this same repo exists at ./coding-agent/ - it is untracked and breaks 'git add -A'; prefer explicit paths or delete that directory.",
       "source": "initial push",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "key": "eval.harness",
+      "value": "Evaluation (M9) is offline and cheap: 'cd backend && ../.venv/Scripts/python.exe -m app.evaluation.cli run' gates 50 golden parser cases and 15 agent scenarios (six dimensions) through the real stack in ~4s, writes runs/evaluation/<stamp>/ and exits 1 on any threshold miss. Cases carry their contract; a known limitation lives in the case's known_gap field and tests/test_evaluation_regression.py asserts it is unchanged - so fixing one requires updating the dataset.",
+      "source": "M9 evaluation",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "key": "provider.registry",
+      "value": "Model providers are adapters in backend/app/providers (browser | scripted | openai_compatible) selected by provider.adapter in state/settings.json; the AgentLoop only ever sees a ModelClient, so a new provider is an adapter plus a registration. Secret options never persist (they come from the environment). Inspect with 'python -m app.providers.cli list|show|check'.",
+      "source": "M9 multi-provider",
       "updated_at": "2026-09-11"
     }
   ]

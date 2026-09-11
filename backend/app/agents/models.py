@@ -41,12 +41,51 @@ EventType = Literal[
     "context_pressure",
     "context_rotated",
     "model_recovered",
+    # Console-facing events (M8): the runtime reports its own state, publishes
+    # a confirmation for a human to answer, and surfaces errors.
+    "agent_update",
+    "confirm_request",
+    "error",
+    "done",
     "run_end",
 ]
 
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def safe_event(
+    type_: str,
+    step: int = 0,
+    message: str = "",
+    tool: str | None = None,
+    ok: bool | None = None,
+    data: dict[str, Any] | None = None,
+) -> AgentEvent:
+    """Build an event without ever raising.
+
+    A caller that publishes an unknown type must not lose the run: an
+    unexpected event becomes an agent_update carrying the original intent.
+    """
+    try:
+        return AgentEvent(
+            type=type_,  # type: ignore[arg-type]
+            step=step,
+            message=message,
+            tool=tool,
+            ok=ok,
+            data=data or {},
+        )
+    except Exception:
+        return AgentEvent(
+            type="agent_update",
+            step=step,
+            message=message,
+            tool=tool,
+            ok=ok,
+            data={**(data or {}), "intended_type": type_},
+        )
 
 
 class LoopLimits(BaseModel):

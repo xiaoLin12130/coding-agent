@@ -1,12 +1,15 @@
-import type { ChatClient } from "../lib/ws";
-import type { ClientFrame, ConnectionStatus, ServerFrame } from "../types";
+import type { ParsedFrame } from "../lib/ws";
+import type { ChatClient, ChatClientFrame } from "../lib/ws";
+import type { JsonValue } from "../api/schema";
+import type { AgentEventName, ChatMessage, ConnectionStatus } from "../types/ui";
 
 /** In-memory ChatClient so tests never open a real socket. */
 export class FakeChatClient implements ChatClient {
-  sent: ClientFrame[] = [];
+  sent: ChatClientFrame[] = [];
   status: ConnectionStatus = "disconnected";
+  rawSent: string[] = [];
 
-  private messageHandlers = new Set<(frame: ServerFrame) => void>();
+  private messageHandlers = new Set<(frame: ParsedFrame) => void>();
   private statusHandlers = new Set<(status: ConnectionStatus) => void>();
   private noticeHandlers = new Set<(notice: string) => void>();
 
@@ -18,9 +21,10 @@ export class FakeChatClient implements ChatClient {
     this.setStatus("disconnected");
   }
 
-  send(frame: ClientFrame): boolean {
+  send(frame: ChatClientFrame): boolean {
     if (this.status !== "connected") return false;
     this.sent.push(frame);
+    this.rawSent.push(JSON.stringify(frame));
     return true;
   }
 
@@ -28,7 +32,7 @@ export class FakeChatClient implements ChatClient {
     return this.status;
   }
 
-  onMessage(handler: (frame: ServerFrame) => void): () => void {
+  onMessage(handler: (frame: ParsedFrame) => void): () => void {
     this.messageHandlers.add(handler);
     return () => this.messageHandlers.delete(handler);
   }
@@ -43,9 +47,23 @@ export class FakeChatClient implements ChatClient {
     return () => this.noticeHandlers.delete(handler);
   }
 
-  /** Test hook: push a server frame as if it arrived on the socket. */
-  emit(frame: ServerFrame): void {
+  /** Test hook: push a parsed frame as if it arrived on the socket. */
+  emit(frame: ParsedFrame): void {
     this.messageHandlers.forEach((handler) => handler(frame));
+  }
+
+  /** Test hook: push a documented envelope event. */
+  emitEvent(
+    event: AgentEventName,
+    payload: Record<string, JsonValue> = {},
+    extra: { request_id?: string; tool_call_id?: string; agent_id?: string } = {},
+  ): void {
+    this.emit(eventFrame(event, payload, extra));
+  }
+
+  /** Test hook: push an M0 message frame. */
+  emitMessage(id: string, role: "user" | "assistant", content: string): void {
+    this.emit(messageFrame(id, role, content));
   }
 
   emitNotice(notice: string): void {
@@ -58,14 +76,26 @@ export class FakeChatClient implements ChatClient {
   }
 }
 
-export function assistantFrame(id: string, content: string): ServerFrame {
+export function messageFrame(
+  id: string,
+  role: "user" | "assistant",
+  content: string,
+): ParsedFrame {
+  const message: ChatMessage = { id, role, content, created_at: new Date().toISOString() };
+  return { kind: "message", message };
+}
+
+export function eventFrame(
+  event: AgentEventName,
+  payload: Record<string, JsonValue> = {},
+  extra: { request_id?: string; tool_call_id?: string; agent_id?: string } = {},
+): ParsedFrame {
   return {
-    type: "message",
-    message: {
-      id,
-      role: "assistant",
-      content,
-      created_at: new Date().toISOString(),
-    },
+    kind: "event",
+    event,
+    timestamp: new Date().toISOString(),
+    session_id: "session-1",
+    payload,
+    ...extra,
   };
 }

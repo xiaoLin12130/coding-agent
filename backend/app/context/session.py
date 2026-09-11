@@ -343,6 +343,33 @@ class SessionManager:
 
     # -- maintenance -------------------------------------------------------
 
+    def archive_session(self, session_id: str) -> SessionInfo:
+        """Archive a session that is NOT active: summarise and copy it out.
+
+        The active session is archived by rotate() instead, because archiving
+        it must also open the continuation.
+        """
+        info = self._index.find(session_id)
+        if info is None:
+            info = SessionInfo(id=session_id)
+            self._index.sessions.append(info)
+
+        summary = self.transcript.summarize(
+            session_id, keep_turns=self.keep_turns_on_rotation
+        )
+        summary_path = self.root / SUMMARIES_DIR / f"{session_id}.json"
+        self.transcript.write_summary(summary, summary_path)
+        archive_path = self.transcript.archive(
+            session_id, self.root / ARCHIVE_DIR / f"{session_id}.jsonl"
+        )
+
+        info.archived = True
+        info.summary_path = str(summary_path)
+        info.archive_path = str(archive_path)
+        info.updated_at = _now()
+        self._write_index()
+        return info
+
     def archived_sessions(self) -> list[SessionInfo]:
         return [info for info in self._index.sessions if info.archived]
 

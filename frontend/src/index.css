@@ -14,6 +14,10 @@
     font-family: ui-sans-serif, system-ui, "Segoe UI", Roboto, Helvetica, Arial,
       sans-serif;
   }
+
+  ::selection {
+    @apply bg-accent/40;
+  }
 }
 
 @layer utilities {
@@ -21,4 +25,49 @@
     scrollbar-width: thin;
     scrollbar-color: #2f3846 transparent;
   }
+
+  .scroll-thin::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+
+  .scroll-thin::-webkit-scrollbar-thumb {
+    background-color: #2f3846;
+    border-radius: 9999px;
+  }
+}
+
+/* Markdown body: keep the information density readable inside chat bubbles. */
+.markdown-body > *:first-child {
+  margin-top: 0;
+}
+
+.markdown-body > *:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-body h1,
+.markdown-body h2,
+.markdown-body h3 {
+  @apply mt-3 mb-1 font-semibold text-slate-100;
+}
+
+.markdown-body h1 {
+  @apply text-base;
+}
+
+.markdown-body h2 {
+  @apply text-sm;
+}
+
+.markdown-body h3 {
+  @apply text-sm text-slate-200;
+}
+
+.markdown-body blockquote {
+  @apply my-2 border-l-2 border-edge pl-3 text-slate-400;
+}
+
+.markdown-body hr {
+  @apply my-3 border-edge;
 }

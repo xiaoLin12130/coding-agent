@@ -1,43 +1,35 @@
 {
-  "current_milestone": "M7",
+  "current_milestone": "M9",
   "current_task": null,
-  "goal": "M7 — Runtime Multi-Agent: Planner, Coder, Reviewer, MemoryCurator, StateKeeper and SafetyGuard under an AgentOrchestrator, completing a coding task collaboratively within bounded rounds, steps and time, without bypassing the Executor or writing shared state directly.",
-  "milestone_status": "M7 complete, M8 not started",
+  "goal": "M9 — Evaluation and Multi-Provider: a golden parser set and an agent evaluation over the six required dimensions, gated by thresholds, plus a provider registry so a new provider never changes the AgentLoop.",
+  "milestone_status": "M9 complete",
   "todos": [
     {
-      "content": "M7: RoleSpec + the six roles with capability-scoped tool allowlists",
+      "content": "M9: provider registry + adapters (browser / scripted / openai-compatible) behind ModelClient",
       "status": "completed"
     },
     {
-      "content": "M7: ToolRegistry.subset so a role's tools are enforced by capability",
+      "content": "M9: provider selection through the settings document (+ catalog, secret options, cache reset)",
       "status": "completed"
     },
     {
-      "content": "M7: review/safety verdict parsing (unknown is never approval)",
+      "content": "M9: provider CLI (list / show / check) and tests, including the loop running unchanged over every provider",
       "status": "completed"
     },
     {
-      "content": "M7: AgentOrchestrator (Planner -> SafetyGuard -> Coder/Reviewer rounds -> StateKeeper + MemoryCurator)",
+      "content": "M9: golden parser set (50 cases over the eight categories required by docs/testing.md)",
       "status": "completed"
     },
     {
-      "content": "M7: bounds — max_rounds, per-role max_steps, wall-clock timeout, stall detection",
+      "content": "M9: agent scenarios (15 cases over the six dimensions) with fault injection and real components",
       "status": "completed"
     },
     {
-      "content": "M7: per-role model routing (model_factory) + role-tagged events",
+      "content": "M9: thresholds, markdown/JSON report and evaluation CLI",
       "status": "completed"
     },
     {
-      "content": "M7: role tool calls written to the shared audit log",
-      "status": "completed"
-    },
-    {
-      "content": "M7: app.agents.cli roles/orchestrate",
-      "status": "completed"
-    },
-    {
-      "content": "M7: tests incl. the four hard constraints and a collaborative acceptance run",
+      "content": "M9: regression gate test + full backend/frontend verification",
       "status": "completed"
     }
   ],
@@ -79,17 +71,13 @@
     "backend/app/api/context.py",
     "backend/app/deps.py",
     "backend/app/main.py",
-    "backend/app/config.py",
     "backend/app/models.py",
-    "backend/tests/conftest.py",
     "backend/tests/test_transcript_store.py",
     "backend/tests/test_memory_store.py",
     "backend/tests/test_context_builder.py",
     "backend/tests/test_session_manager.py",
     "backend/tests/test_context_api.py",
     "backend/tests/test_context_cli.py",
-    "backend/tests/test_storage.py",
-    "backend/README.md",
     "backend/app/tools/__init__.py",
     "backend/app/tools/models.py",
     "backend/app/tools/errors.py",
@@ -103,7 +91,6 @@
     "backend/tests/test_tools_executor.py",
     "backend/tests/test_tools_builtin.py",
     "backend/tests/test_tools_cli.py",
-    "backend/README.md",
     "backend/app/safety/__init__.py",
     "backend/app/safety/models.py",
     "backend/app/safety/policy.py",
@@ -112,36 +99,24 @@
     "backend/app/safety/injection.py",
     "backend/app/safety/layer.py",
     "backend/app/safety/cli.py",
-    "backend/app/tools/executor.py",
-    "backend/app/tools/errors.py",
     "backend/tests/test_safety_paths.py",
     "backend/tests/test_safety_shell.py",
     "backend/tests/test_safety_injection.py",
     "backend/tests/test_safety_layer.py",
     "backend/tests/test_safety_executor_integration.py",
     "backend/tests/test_safety_cli.py",
-    "backend/README.md",
     "backend/app/agents/__init__.py",
     "backend/app/agents/models.py",
     "backend/app/agents/llm.py",
     "backend/app/agents/checkpoint.py",
     "backend/app/agents/loop.py",
     "backend/app/agents/cli.py",
-    "backend/app/config.py",
-    "backend/app/tools/executor.py",
-    "backend/app/tools/errors.py",
-    "backend/app/tools/builtin.py",
-    "backend/app/browser/driver.py",
-    "backend/app/browser/web_chat.py",
     "backend/tests/test_agent_llm.py",
     "backend/tests/test_agent_checkpoint.py",
     "backend/tests/test_agent_loop.py",
     "backend/tests/test_agent_acceptance.py",
     "backend/tests/test_agent_cli.py",
     "backend/tests/test_agent_browser_integration.py",
-    "backend/tests/test_tools_executor.py",
-    "backend/tests/test_web_chat_provider.py",
-    "backend/README.md",
     "backend/app/recovery/__init__.py",
     "backend/app/recovery/models.py",
     "backend/app/recovery/thresholds.py",
@@ -151,10 +126,6 @@
     "backend/app/recovery/snapshot.py",
     "backend/app/recovery/cli.py",
     "backend/app/api/recovery.py",
-    "backend/app/agents/loop.py",
-    "backend/app/agents/llm.py",
-    "backend/app/agents/models.py",
-    "backend/app/main.py",
     "backend/tests/test_recovery_thresholds.py",
     "backend/tests/test_recovery_session.py",
     "backend/tests/test_recovery_run.py",
@@ -162,19 +133,50 @@
     "backend/tests/test_recovery_api.py",
     "backend/tests/test_recovery_cli.py",
     "backend/tests/test_recovery_acceptance.py",
-    "backend/tests/test_agent_llm.py",
-    "backend/tests/test_agent_loop.py",
-    "backend/README.md",
     "backend/app/agents/roles.py",
     "backend/app/agents/orchestrator.py",
-    "backend/app/agents/models.py",
-    "backend/app/agents/cli.py",
-    "backend/app/agents/__init__.py",
-    "backend/app/tools/registry.py",
     "backend/tests/test_agent_roles.py",
     "backend/tests/test_agent_orchestrator.py",
     "backend/tests/test_agent_orchestrator_cli.py",
-    "backend/README.md"
+    "backend/app/runtime.py",
+    "backend/app/console_model.py",
+    "backend/app/settings.py",
+    "backend/app/api/console.py",
+    "backend/app/api/ws.py",
+    "backend/tests/test_console_runtime.py",
+    "backend/tests/test_console_api.py",
+    "frontend/ (full console: api/, components/, lib/, store/, scripts/, tests)",
+    "backend/app/providers/__init__.py",
+    "backend/app/providers/models.py",
+    "backend/app/providers/registry.py",
+    "backend/app/providers/browser.py",
+    "backend/app/providers/scripted.py",
+    "backend/app/providers/openai_compatible.py",
+    "backend/app/providers/cli.py",
+    "backend/app/evaluation/__init__.py",
+    "backend/app/evaluation/models.py",
+    "backend/app/evaluation/dataset.py",
+    "backend/app/evaluation/parser_eval.py",
+    "backend/app/evaluation/agent_eval.py",
+    "backend/app/evaluation/thresholds.py",
+    "backend/app/evaluation/report.py",
+    "backend/app/evaluation/runner.py",
+    "backend/app/evaluation/cli.py",
+    "backend/evaluation/parser_golden.jsonl",
+    "backend/evaluation/agent_cases.json",
+    "backend/tests/test_providers_registry.py",
+    "backend/tests/test_provider_scripted.py",
+    "backend/tests/test_provider_openai.py",
+    "backend/tests/test_providers_cli.py",
+    "backend/tests/test_providers_loop.py",
+    "backend/tests/test_evaluation_dataset.py",
+    "backend/tests/test_evaluation_parser.py",
+    "backend/tests/test_evaluation_agent.py",
+    "backend/tests/test_evaluation_report.py",
+    "backend/tests/test_evaluation_cli.py",
+    "backend/tests/test_evaluation_regression.py",
+    "backend/tests/test_ws.py",
+    "docs/testing.md"
   ],
   "tests": [
     {
@@ -226,19 +228,64 @@
       "date": "2026-09-11"
     },
     {
-      "name": "backend pytest (M0..M7)",
-      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
-      "result": "691 passed in 216.9s (M7 added 58: test_agent_roles 27, test_agent_orchestrator 25, test_agent_orchestrator_cli 6)",
-      "date": "2026-09-11"
-    },
-    {
       "name": "M7 acceptance run (real process, outside pytest)",
       "command": "python -m app.agents.cli orchestrate --task 'add(2,3) returns -1; fix it and verify' --script plan.json --confirm once",
       "result": "PASS: status=completed in 1 round of 3; all six roles ran (planner, safety_guard, coder, reviewer, state_keeper, memory_curator); 5 tool calls, 0 failed; the coder used read_file + apply_patch + run_shell and the check reported '1 passed'; the file changed to 'return a + b'; project state recorded current_task and files_changed; the memory curator's proposal was stored through the review pipeline; the audit log holds all five calls with run_shell confirmed=true",
       "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M8)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "759 passed (M8 added 68: test_console_runtime 16, test_console_api 32, plus loop/settings/archive additions)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "frontend unit/integration (vitest + jsdom)",
+      "command": "cd frontend && npm test",
+      "result": "66 passed in 7 files (ws 14, events 8, store 18, ChatPanel 12, App 6, Settings 4, Observability 4)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "frontend typecheck + production build",
+      "command": "cd frontend && npx tsc --noEmit && npm run build",
+      "result": "0 type errors; dist index.html 0.41 kB, CSS 18.92 kB, JS 494.91 kB (gzip 149.16 kB), 368 modules",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M8 end-to-end: Playwright drives the real console against the live backend",
+      "command": "uvicorn (real app + scripted model) + vite dev, then Playwright on http://127.0.0.1:5273",
+      "result": "PASS: the console reported 'backend online' and the real provider; a run started from the Agents tab; the Tools tab showed 3 distinct tool cards (read_file, apply_patch, run_shell) with durations and summaries; the chat column showed the same 3 in order; State/Memory/Files/Terminal/Logs/Agents/Observe/Settings tabs all rendered; the server-side audit log confirmed read_file, apply_patch, run_shell all ok and the check printed '1 passed'; no page errors and no failed requests",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M9), non-browser files",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest --ignore=tests/test_browser_driver.py --ignore=tests/test_web_chat_provider.py --ignore=tests/test_agent_browser_integration.py --ignore=tests/test_recovery_browser.py",
+      "result": "800 passed in 116s (M9 added 97: providers 50, evaluation 47)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M9), browser files",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest tests/test_browser_driver.py tests/test_web_chat_provider.py tests/test_agent_browser_integration.py tests/test_recovery_browser.py",
+      "result": "40 passed in 107s (real headed Chromium)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M9 evaluation suites",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m app.evaluation.cli run",
+      "result": "PASS: parser 50/50 exact match 100%, agent 15/15 (tool_selection 3, tool_parsing 2, task_completion 2, recovery 2, safety 4, context_switching 2); report in runs/evaluation/<stamp>/",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "frontend typecheck + unit/integration (unchanged by M9)",
+      "command": "cd frontend && npx tsc --noEmit && npm test",
+      "result": "0 type errors; 66 passed in 7 files",
+      "date": "2026-09-11"
     }
   ],
-  "failures": [],
+  "failures": [
+    "M8 defect found while making the M9 regression gate run: app/api/ws.py EVENT_NAMES had no entry for the runtime's 'done' and 'error' events, so every run end and every failure reached WebSocket clients as 'agent_update' and the documented names were unreachable. The test that covered it (test_console_api.py::test_ws_run_streams_documented_events) waited forever for a frame that could not arrive, which is why the backend suite hung for minutes instead of failing. Mapping added and guarded by tests in tests/test_ws.py.",
+    "Known parser limitations recorded as known_gap in backend/evaluation/parser_golden.jsonl (not fixed in M9, which is an evaluation milestone): a truncated second call after a complete one is dropped without any issue; a call quoted as an example in prose is executed like a real one; identical calls are returned twice."
+  ],
   "decisions": [
     "M1 drives the browser through a selector-driven WebChatProvider fed by JSON provider profiles; site detail never lives in provider or (future) agent code.",
     "The browser is always headed: BrowserDriver(headless=True) raises BrowserConfigError, and no stealth/fingerprint/automation-evasion launch flags are used.",
@@ -297,7 +344,23 @@
     "M7 bounds the collaboration four ways: max_rounds, each role's own max_steps, a wall-clock budget checked before each round, and stall detection (the same verdict AND the same issues twice stops the run). The orchestrator takes an injectable clock so the time bound is provable in a test without waiting.",
     "AgentOrchestrator accepts model_factory so a deployment can route roles to different models (a stronger reviewer), and so tests can script each role separately; a single shared reply queue is unusable for roles that make several model calls per run (found while writing the CLI acceptance).",
     "Role tool calls are written to the same runs/tool-calls.jsonl audit log as single-agent runs (found in the acceptance run: role Executors had no log path, so multi-agent work went unaudited). Confirmations are recorded there too.",
-    "The orchestrator collects the roles' events into OrchestrationResult; without them the result showed that a role failed but not why (found by a test)."
+    "The orchestrator collects the roles' events into OrchestrationResult; without them the result showed that a role failed but not why (found by a test).",
+    "M8 keeps every execution boundary: the console runs the same AgentLoop/AgentOrchestrator, so the M4 SafetyLayer, the Executor and the audit log apply unchanged; the runtime adds observation, a stop flag and a confirmation channel, not a new execution path.",
+    "The runtime serves ONE run at a time (a second start is 409). The event ring, the stop flag and the confirmation queue describe exactly one run, so allowing two would make 'stop' and 'confirm' ambiguous.",
+    "An unanswered confirmation expires and is treated as a rejection, so a run can never hang because a browser tab was closed. The default policy is 'ask'; 'auto_once' exists for unattended runs and 'deny' for a locked-down one.",
+    "Tool call ids are now unique for the whole run (<run>-<step>-<index>). They were unique only within one parse, and since each step parses a single call every id was 'call-1'; the console pairs tool_call with tool_result by id, so all three cards collapsed into one (found by driving the real UI, not by a unit test).",
+    "A confirmation's answer is published as an agent_update, not a tool_result: the old typing produced a result with no call_id, which a console renders as a phantom card.",
+    "The WS protocol carries two frame families on one socket (M0 echo plus the documented envelope), and correlation ids (request_id, tool_call_id, agent_id) are TOP-LEVEL as docs/api-protocol.md requires, so a client can key on them without reading the payload.",
+    "Frontend types are generated from the backend OpenAPI schema (scripts/gen-api-types.mjs, committed snapshot) so no backend model is maintained twice, per docs/api-protocol.md.",
+    "Contract alignment after the frontend reported mismatches: the confirmation policy is ask|auto_once|deny with 'once' accepted as a normalised alias, POST /api/sessions accepts the title as a body or a query parameter, and confirm_request carries request_id in the payload and at the top level.",
+    "M9 providers are a registry behind the same ModelClient protocol the loop already used: the browser, an offline scripted replay and an OpenAI-compatible HTTP endpoint are three registrations, and app/agents is untouched (a test asserts the loop module never mentions the registry).",
+    "The registry rejects an option name a provider does not declare, but one settings document may still hold every adapter's options: options are filtered by declared name for the ACTIVE adapter, so a typo for the running provider still raises while an inactive adapter's base_url is simply not passed.",
+    "A provider option marked secret is never written to the settings document: it is read from the environment (api_key_env) when the model is built, and stripped on save.",
+    "Choosing a provider is configuration, not code: deps.build_console_model() resolves adapter/model/options from the settings document, and saving a different provider drops the cached model so the next run uses what the page shows.",
+    "The evaluation harness runs the REAL components (parser, SafetyLayer, Executor, AgentLoop, SessionManager) in a throwaway workspace per case; only the model is scripted, and the recovery cases break it on purpose first (fault injection), so 'recovery' is demonstrated rather than assumed.",
+    "A case carries its contract, and the harness reports the difference; it never rewrites the expectation to match the implementation. Observed behaviour that is a genuine limitation is recorded in a known_gap field whose expectation still describes today's behaviour, and the regression test asserts that gap is unchanged - so fixing one forces a dataset update in the same change.",
+    "Thresholds require 100% of both suites plus coverage of the eight parser categories, the six dimensions and the case counts, so a regression fails the suite instead of quietly lowering a number. A suite that did not run is absent (None) rather than an empty report, because an empty report reads as 'ran and found nothing'.",
+    "M9 evaluated the agent, it did not re-implement it: the three parser limitations the golden set exposed are recorded and left to a future change, because fixing M3 parse behaviour is not this milestone's task."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -321,9 +384,17 @@
     "Recovery is bounded everywhere: a restart budget, a login timeout, one retry per call and a bounded parse retry. Nothing retries forever.",
     "M7 is complete: backend/app/agents/{roles,orchestrator}.py plus the models/CLI/registry additions; 691 backend tests green.",
     "docs/runtime-agents.md's four hard constraints are each covered by tests: no Executor bypass (roles hold no tools, and the role registry is the only way in), no direct shared-state writes (only the two tools change state), no infinite loop (round/step/time bounds), no infinite conversation (stall detection).",
-    "The roles add no new execution path: they are AgentLoops with restricted registries and role-specific prompts, so M4 safety and M3 parsing apply unchanged inside a collaboration."
+    "The roles add no new execution path: they are AgentLoops with restricted registries and role-specific prompts, so M4 safety and M3 parsing apply unchanged inside a collaboration.",
+    "M8 is complete: backend runtime/settings/console API/WS protocol plus the full frontend console; 759 backend tests and 66 frontend tests green.",
+    "The frontend was built by a delegated subagent under a frozen contract; I independently re-ran its verification (tsc, npm test 66, npm run build) and additionally drove the real UI with Playwright against the live backend, which is what exposed the tool-call-id and confirmation-event defects.",
+    "Known limits the console shows honestly: memory is read-only (no endpoint to edit it), there is no file-content endpoint (the Files panel shows files_changed and any diffs the stream carried), and there is no PTY (the Terminal tab shows executor commands and results).",
+    "M8 was still uncommitted when M9 started (the M8 work tree was never committed by that session), so M8 and M9 are committed together; the M8 file set and the M9 changes cannot be separated by file any more because deps.py, settings.py, api/console.py and api/ws.py carry both.",
+    "The M9 evaluation found and fixed a real M8 defect (the missing done/error WebSocket names). Before the fix the non-browser backend suite did not finish inside 10 minutes; after it, the same suite runs in 116s.",
+    "Evaluation reports are written to runs/evaluation/<stamp>/ (gitignored); the golden sets themselves are committed under backend/evaluation/.",
+    "docs/api-protocol.md lists memory_update among the WebSocket events, but the runtime has no memory-change event and none was invented: it is the one documented event a client cannot receive, and tests/test_ws.py records that exception explicitly.",
+    "Evaluation is fully offline: no browser, no network and no real model are involved, so it runs in about 4 seconds and can gate every change."
   ],
-  "checkpoint": "M7 checkpoint 2026-09-11: runtime multi-agent complete (six capability-scoped roles under a bounded orchestrator, verdict-driven Planner -> Coder -> Reviewer loop with stall detection, per-role model routing, shared audit log), collaborative acceptance verified in a real process, 691 backend tests green. Next milestone: M8 (Frontend Workbench).",
+  "checkpoint": "M9 checkpoint 2026-09-11: provider registry with three adapters (browser, offline scripted, OpenAI-compatible HTTP) selectable from the settings document without touching the AgentLoop; golden parser set of 50 cases over the eight required categories; 15 agent scenarios over the six required dimensions running the real stack with fault injection; thresholds, markdown/JSON report and an evaluation CLI; regression gate in pytest. 840 backend tests (800 non-browser + 40 browser) and 66 frontend tests green. A real M8 defect (the WebSocket never delivered 'done' or 'error') was found and fixed along the way. Project milestone list is now complete: M0..M9.",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",

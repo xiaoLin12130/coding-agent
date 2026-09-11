@@ -12,6 +12,9 @@ coverage/
 # Session transcripts (runtime data, M2)
 state/sessions/
 
+# Run checkpoints and evaluation reports (runtime data, M5/M9)
+state/checkpoints/
+
 # Browser layer artifacts (M1)
 runs/
 .browser-profile/

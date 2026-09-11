@@ -1,24 +1,27 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
-import { ChatPanel } from "./components/ChatPanel";
-import { SessionPanel } from "./components/SessionPanel";
-import { WorkbenchPanel } from "./components/WorkbenchPanel";
+import { ChatPanel } from "./components/chat/ChatPanel";
+import { SessionPanel } from "./components/sessions/SessionPanel";
+import { TopBar } from "./components/TopBar";
+import { WorkbenchPanel, type WorkbenchTab } from "./components/workbench/WorkbenchPanel";
 import { useAppStore } from "./store/useAppStore";
 
 export default function App() {
-  const connect = useAppStore((state) => state.connect);
-  const loadState = useAppStore((state) => state.loadState);
+  const bootstrap = useAppStore((state) => state.bootstrap);
+  const [tab, setTab] = useState<WorkbenchTab>("State");
 
   useEffect(() => {
-    connect();
-    void loadState();
-  }, [connect, loadState]);
+    void bootstrap();
+  }, [bootstrap]);
 
   return (
-    <div data-testid="app-shell" className="flex h-full w-full overflow-hidden">
-      <SessionPanel />
-      <ChatPanel />
-      <WorkbenchPanel />
+    <div className="flex h-full w-full flex-col overflow-hidden">
+      <TopBar />
+      <div data-testid="app-shell" className="flex min-h-0 flex-1 overflow-hidden">
+        <SessionPanel onOpenSettings={() => setTab("Settings")} />
+        <ChatPanel />
+        <WorkbenchPanel tab={tab} setTab={setTab} />
+      </div>
     </div>
   );
 }

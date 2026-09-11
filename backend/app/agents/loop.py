@@ -271,6 +271,15 @@ class AgentLoop:
                 status, reason = "error", "the model output could not be parsed"
                 break
 
+            # Tool call ids must be unique for the WHOLE run, not just within
+            # one parse: a console pairs tool_call with tool_result by id, and
+            # every step parsing a single call would otherwise reuse "call-1"
+            # and collapse every card into one.
+            outcome.calls = [
+                call.model_copy(update={"id": f"{run_id}-{step_index}-{call.index}"})
+                for call in outcome.calls
+            ]
+
             if not outcome.calls:
                 # No tool call means the model considers the task done.
                 if denied_reasons:
@@ -440,7 +449,30 @@ class AgentLoop:
         real execution rather than to a refusal that was never going to run.
         """
         attempts: list[ToolAttempt] = []
-        events.append(self._event("tool_start", step, call.name, tool=call.name))
+        spec = (
+            self.executor.registry.get(call.name).spec
+            if self.executor.registry.has(call.name)
+            else None
+        )
+        # A Tool Card needs the call id, the parameters and the risk, so they
+        # travel with the event rather than being looked up afterwards.
+        events.append(
+            self._event(
+                "tool_start",
+                step,
+                call.name,
+                tool=call.name,
+                data={
+                    "call_id": call.id,
+                    "tool": call.name,
+                    "arguments": dict(call.arguments),
+                    "risk": getattr(spec, "risk", "low"),
+                    "requires_confirmation": bool(
+                        getattr(spec, "requires_confirmation", False)
+                    ),
+                },
+            )
+        )
 
         confirmed = self._confirm_if_needed(call, step, events)
         result = self.executor.execute(call, confirmed=confirmed)
@@ -483,14 +515,28 @@ class AgentLoop:
             )
 
         record.tool_attempts[call.id] = attempts
+        summary = (
+            result.output[:160]
+            if result.ok
+            else (result.error.code + ": " + result.error.message[:160])
+        )
         events.append(
             self._event(
                 "tool_result",
                 step,
-                (result.output[:160] if result.ok else (result.error.code + ": " + result.error.message[:160])),
+                summary,
                 tool=call.name,
                 ok=result.ok,
-                data={"risk": result.risk, "attempts": len(attempts)},
+                data={
+                    "call_id": call.id,
+                    "tool": call.name,
+                    "ok": result.ok,
+                    "error_code": result.error.code if result.error else None,
+                    "risk": result.risk,
+                    "duration_ms": result.duration_ms,
+                    "attempts": len(attempts),
+                    "summary": summary,
+                },
             )
         )
         return [result]
@@ -514,13 +560,22 @@ class AgentLoop:
         if choice not in ("reject", "once", "session"):
             return False
         decision = self.safety.decide(call, choice)  # type: ignore[arg-type]
+        # This is the ANSWER to a confirmation, not a tool result: emitting it
+        # as tool_result would create a phantom result with no call_id and the
+        # console would render a duplicate card.
         events.append(
             self._event(
-                "tool_result",
+                "agent_update",
                 step,
                 "confirmation: " + choice + " -> " + decision.decision,
                 tool=call.name,
                 ok=decision.decision == "allow",
+                data={
+                    "tool": call.name,
+                    "choice": choice,
+                    "decision": decision.decision,
+                    "call_id": call.id,
+                },
             )
         )
         return decision.decision == "allow"

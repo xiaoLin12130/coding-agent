@@ -1,0 +1,1669 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Coding Agent backend (frozen console contract)",
+    "version": "0.8.0",
+    "description": "Snapshot of the console contract (docs/api-protocol.md + milestones/M8.md) used by scripts/gen-api-types.mjs when the backend is not reachable. Regenerate from the live backend with: npm run gen:api -- --refresh-snapshot"
+  },
+  "paths": {
+    "/api/health": {
+      "get": {
+        "operationId": "health"
+      }
+    },
+    "/api/project_state": {
+      "get": {
+        "operationId": "read_project_state"
+      }
+    },
+    "/api/memory": {
+      "get": {
+        "operationId": "read_memory"
+      }
+    },
+    "/api/sessions": {
+      "get": {
+        "operationId": "list_sessions"
+      },
+      "post": {
+        "operationId": "create_session"
+      }
+    },
+    "/api/sessions/{session_id}": {
+      "get": {
+        "operationId": "read_session"
+      }
+    },
+    "/api/sessions/{session_id}/archive": {
+      "post": {
+        "operationId": "archive_session"
+      }
+    },
+    "/api/messages": {
+      "get": {
+        "operationId": "list_messages"
+      }
+    },
+    "/api/context": {
+      "get": {
+        "operationId": "build_context"
+      }
+    },
+    "/api/recovery": {
+      "get": {
+        "operationId": "recovery_snapshot"
+      }
+    },
+    "/api/recovery/runs": {
+      "get": {
+        "operationId": "recovery_runs"
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "read_settings"
+      },
+      "put": {
+        "operationId": "write_settings"
+      }
+    },
+    "/api/logs": {
+      "get": {
+        "operationId": "read_logs"
+      }
+    },
+    "/api/agents": {
+      "get": {
+        "operationId": "read_agents"
+      }
+    },
+    "/api/observability/artifacts": {
+      "get": {
+        "operationId": "list_artifacts"
+      }
+    },
+    "/api/observability/file": {
+      "get": {
+        "operationId": "read_artifact"
+      }
+    },
+    "/api/agent/run": {
+      "post": {
+        "operationId": "start_run"
+      }
+    },
+    "/api/agent/stop": {
+      "post": {
+        "operationId": "stop_run"
+      }
+    },
+    "/api/agent/confirm": {
+      "post": {
+        "operationId": "confirm_run"
+      }
+    },
+    "/api/agent/state": {
+      "get": {
+        "operationId": "agent_state"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Health": {
+        "type": "object",
+        "description": "GET /api/health",
+        "required": [
+          "status",
+          "app",
+          "version"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "app": {
+            "type": "string"
+          },
+          "version": {
+            "type": "string"
+          }
+        }
+      },
+      "TodoItem": {
+        "type": "object",
+        "required": [
+          "content",
+          "status"
+        ],
+        "properties": {
+          "content": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          }
+        }
+      },
+      "ProjectState": {
+        "type": "object",
+        "description": "GET /api/project_state - the factual state of the project.",
+        "required": [
+          "current_milestone",
+          "current_task",
+          "todos",
+          "files_changed",
+          "tests",
+          "failures",
+          "decisions",
+          "checkpoint"
+        ],
+        "properties": {
+          "current_milestone": {
+            "type": "string",
+            "nullable": true
+          },
+          "current_task": {
+            "type": "string",
+            "nullable": true
+          },
+          "goal": {
+            "type": "string",
+            "nullable": true
+          },
+          "todos": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TodoItem"
+            }
+          },
+          "files_changed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "tests": {
+            "type": "array",
+            "items": {}
+          },
+          "failures": {
+            "type": "array",
+            "items": {}
+          },
+          "decisions": {
+            "type": "array",
+            "items": {}
+          },
+          "checkpoint": {
+            "nullable": true
+          },
+          "commands_run": {
+            "type": "array",
+            "items": {}
+          },
+          "git_branch": {
+            "type": "string",
+            "nullable": true
+          },
+          "cwd": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MemoryEntry": {
+        "type": "object",
+        "required": [
+          "key",
+          "value",
+          "namespace",
+          "source",
+          "sensitive"
+        ],
+        "properties": {
+          "key": {
+            "type": "string"
+          },
+          "value": {
+            "type": "string"
+          },
+          "namespace": {
+            "type": "string"
+          },
+          "source": {
+            "type": "string"
+          },
+          "sensitive": {
+            "type": "boolean"
+          },
+          "source_turn": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_by": {
+            "type": "string",
+            "nullable": true
+          },
+          "created_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "updated_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "MemoryResponse": {
+        "type": "object",
+        "description": "GET /api/memory",
+        "required": [
+          "memories"
+        ],
+        "properties": {
+          "memories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryEntry"
+            }
+          }
+        }
+      },
+      "SessionInfo": {
+        "type": "object",
+        "required": [
+          "id",
+          "title",
+          "created_at",
+          "updated_at",
+          "archived",
+          "message_count",
+          "turn_count"
+        ],
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "title": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "message_count": {
+            "type": "integer"
+          },
+          "turn_count": {
+            "type": "integer"
+          },
+          "summary_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "archive_path": {
+            "type": "string",
+            "nullable": true
+          },
+          "rotated_from": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SessionListResponse": {
+        "type": "object",
+        "description": "GET /api/sessions",
+        "required": [
+          "active_session_id",
+          "recovered",
+          "sessions"
+        ],
+        "properties": {
+          "active_session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "recovered": {
+            "type": "boolean"
+          },
+          "sessions": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/SessionInfo"
+            }
+          }
+        }
+      },
+      "SessionCreateRequest": {
+        "type": "object",
+        "description": "POST /api/sessions body (also accepted as ?title=).",
+        "properties": {
+          "title": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "SessionCreateResponse": {
+        "type": "object",
+        "description": "POST /api/sessions",
+        "required": [
+          "active_session_id",
+          "created"
+        ],
+        "properties": {
+          "active_session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "created": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SessionArchiveResponse": {
+        "type": "object",
+        "description": "POST /api/sessions/{id}/archive",
+        "required": [
+          "session_id",
+          "archived"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string"
+          },
+          "archived": {
+            "type": "boolean"
+          },
+          "continues_as": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "TranscriptEntry": {
+        "type": "object",
+        "description": "One message in a session transcript.",
+        "required": [
+          "index",
+          "session_id",
+          "role",
+          "content",
+          "created_at",
+          "meta"
+        ],
+        "properties": {
+          "index": {
+            "type": "integer"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "system",
+              "user",
+              "assistant",
+              "tool"
+            ]
+          },
+          "content": {
+            "type": "string"
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "tool_name": {
+            "type": "string",
+            "nullable": true
+          },
+          "tool_call_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "meta": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "SessionDetail": {
+        "type": "object",
+        "description": "GET /api/sessions/{id}",
+        "required": [
+          "active_session_id",
+          "created",
+          "recovered",
+          "entries",
+          "message_count",
+          "turn_count"
+        ],
+        "properties": {
+          "active_session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "created": {
+            "type": "boolean"
+          },
+          "recovered": {
+            "type": "boolean"
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranscriptEntry"
+            }
+          },
+          "message_count": {
+            "type": "integer"
+          },
+          "turn_count": {
+            "type": "integer"
+          }
+        }
+      },
+      "MessagesResponse": {
+        "type": "object",
+        "description": "GET /api/messages",
+        "required": [
+          "session_id",
+          "message_count",
+          "messages"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "message_count": {
+            "type": "integer"
+          },
+          "messages": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/TranscriptEntry"
+            }
+          }
+        }
+      },
+      "ContextSection": {
+        "type": "object",
+        "required": [
+          "name",
+          "priority",
+          "content",
+          "original_chars",
+          "included_chars",
+          "truncated",
+          "omitted_chars",
+          "note"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "priority": {
+            "type": "integer"
+          },
+          "content": {
+            "type": "string"
+          },
+          "original_chars": {
+            "type": "integer"
+          },
+          "included_chars": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "omitted_chars": {
+            "type": "integer"
+          },
+          "reference": {
+            "type": "string",
+            "nullable": true
+          },
+          "note": {
+            "type": "string"
+          }
+        }
+      },
+      "BuiltContext": {
+        "type": "object",
+        "description": "GET /api/context",
+        "required": [
+          "sections",
+          "dropped_sections",
+          "budget_chars",
+          "total_chars",
+          "truncated",
+          "built_at"
+        ],
+        "properties": {
+          "sections": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ContextSection"
+            }
+          },
+          "dropped_sections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "budget_chars": {
+            "type": "integer"
+          },
+          "total_chars": {
+            "type": "integer"
+          },
+          "truncated": {
+            "type": "boolean"
+          },
+          "built_at": {
+            "type": "string"
+          }
+        }
+      },
+      "ContextPressure": {
+        "type": "object",
+        "required": [
+          "level",
+          "used_chars",
+          "budget_chars",
+          "ratio",
+          "dropped_sections"
+        ],
+        "properties": {
+          "level": {
+            "type": "string",
+            "enum": [
+              "ok",
+              "soft",
+              "hard"
+            ]
+          },
+          "used_chars": {
+            "type": "integer"
+          },
+          "budget_chars": {
+            "type": "integer"
+          },
+          "ratio": {
+            "type": "number"
+          },
+          "dropped_sections": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "RunRecoveryPlan": {
+        "type": "object",
+        "description": "One resumable run checkpoint.",
+        "required": [
+          "run_id",
+          "task",
+          "step",
+          "session_id",
+          "checkpoint_path",
+          "resumable",
+          "reason"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string",
+            "nullable": true
+          },
+          "checkpoint_path": {
+            "type": "string"
+          },
+          "resumable": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "updated_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "RecoverySnapshot": {
+        "type": "object",
+        "description": "GET /api/recovery",
+        "required": [
+          "active_session_id",
+          "session_message_count",
+          "archived_session_ids",
+          "memory_count",
+          "taken_at"
+        ],
+        "properties": {
+          "active_session_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "session_message_count": {
+            "type": "integer"
+          },
+          "archived_session_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "memory_count": {
+            "type": "integer"
+          },
+          "latest_run": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RunRecoveryPlan"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "context_pressure": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ContextPressure"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "taken_at": {
+            "type": "string"
+          }
+        }
+      },
+      "RecoveryRunsResponse": {
+        "type": "array",
+        "description": "GET /api/recovery/runs",
+        "items": {
+          "$ref": "#/components/schemas/RunRecoveryPlan"
+        }
+      },
+      "ProviderSettings": {
+        "type": "object",
+        "required": [
+          "name",
+          "url",
+          "verified",
+          "notes"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string"
+          },
+          "verified": {
+            "type": "boolean"
+          },
+          "notes": {
+            "type": "string"
+          },
+          "profiles": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "BrowserSettings": {
+        "type": "object",
+        "required": [
+          "profile_dir",
+          "artifacts_dir",
+          "headless_allowed"
+        ],
+        "properties": {
+          "profile_dir": {
+            "type": "string"
+          },
+          "artifacts_dir": {
+            "type": "string"
+          },
+          "headless_allowed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "SafetySettings": {
+        "type": "object",
+        "required": [
+          "project_root",
+          "extra_roots",
+          "confirm_high_risk"
+        ],
+        "properties": {
+          "project_root": {
+            "type": "string"
+          },
+          "extra_roots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "confirm_high_risk": {
+            "type": "boolean"
+          },
+          "sensitive_names": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ConfirmationSettings": {
+        "type": "object",
+        "required": [
+          "policy",
+          "ttl_seconds"
+        ],
+        "properties": {
+          "policy": {
+            "type": "string",
+            "enum": [
+              "ask",
+              "auto_once",
+              "deny",
+              "once"
+            ],
+            "description": "ask | auto_once | deny. The backend also accepts the legacy spelling 'once'."
+          },
+          "ttl_seconds": {
+            "type": "integer"
+          }
+        }
+      },
+      "ContextThresholdSettings": {
+        "type": "object",
+        "required": [
+          "soft_ratio",
+          "hard_ratio",
+          "soft_recent_turns"
+        ],
+        "properties": {
+          "soft_ratio": {
+            "type": "number"
+          },
+          "hard_ratio": {
+            "type": "number"
+          },
+          "soft_recent_turns": {
+            "type": "integer"
+          }
+        }
+      },
+      "AgentRole": {
+        "type": "object",
+        "required": [
+          "name",
+          "purpose",
+          "allowed_tools",
+          "max_steps"
+        ],
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "purpose": {
+            "type": "string"
+          },
+          "allowed_tools": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "max_steps": {
+            "type": "integer"
+          },
+          "verdict_kind": {
+            "type": "string"
+          }
+        }
+      },
+      "MultiAgentSettings": {
+        "type": "object",
+        "required": [
+          "enabled",
+          "max_rounds",
+          "stall_threshold",
+          "roles"
+        ],
+        "properties": {
+          "enabled": {
+            "type": "boolean"
+          },
+          "max_rounds": {
+            "type": "integer"
+          },
+          "stall_threshold": {
+            "type": "integer"
+          },
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRole"
+            }
+          }
+        }
+      },
+      "Settings": {
+        "type": "object",
+        "description": "GET/PUT /api/settings",
+        "required": [
+          "provider",
+          "browser",
+          "working_dir",
+          "safety",
+          "confirmation",
+          "context_thresholds",
+          "multi_agent"
+        ],
+        "properties": {
+          "provider": {
+            "$ref": "#/components/schemas/ProviderSettings"
+          },
+          "browser": {
+            "$ref": "#/components/schemas/BrowserSettings"
+          },
+          "working_dir": {
+            "type": "string"
+          },
+          "safety": {
+            "$ref": "#/components/schemas/SafetySettings"
+          },
+          "confirmation": {
+            "$ref": "#/components/schemas/ConfirmationSettings"
+          },
+          "context_thresholds": {
+            "$ref": "#/components/schemas/ContextThresholdSettings"
+          },
+          "multi_agent": {
+            "$ref": "#/components/schemas/MultiAgentSettings"
+          }
+        }
+      },
+      "ToolCallLogEntry": {
+        "type": "object",
+        "description": "One line of the append-only tool call log.",
+        "required": [
+          "at",
+          "call_id",
+          "name",
+          "arguments_preview",
+          "ok",
+          "duration_ms",
+          "idempotent_replay",
+          "confirmed"
+        ],
+        "properties": {
+          "at": {
+            "type": "string"
+          },
+          "call_id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "arguments_preview": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "idempotent_replay": {
+            "type": "boolean"
+          },
+          "confirmed": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentEvent": {
+        "type": "object",
+        "description": "Runtime event (also carried in the WS envelope payload).",
+        "required": [
+          "type",
+          "step",
+          "at",
+          "message",
+          "data"
+        ],
+        "properties": {
+          "type": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "at": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string",
+            "nullable": true
+          },
+          "ok": {
+            "type": "boolean",
+            "nullable": true
+          },
+          "data": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      },
+      "LogsResponse": {
+        "type": "object",
+        "description": "GET /api/logs",
+        "required": [
+          "tool_calls",
+          "events"
+        ],
+        "properties": {
+          "tool_calls": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/ToolCallLogEntry"
+            }
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentEvent"
+            }
+          }
+        }
+      },
+      "AgentRunInfo": {
+        "type": "object",
+        "description": "One run as the console lists it.",
+        "required": [
+          "run_id",
+          "task",
+          "status",
+          "tool_calls",
+          "duration_ms"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "round_count": {
+            "type": "integer"
+          },
+          "tool_calls": {
+            "type": "integer"
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "started_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "finished_at": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AgentsResponse": {
+        "type": "object",
+        "description": "GET /api/agents",
+        "required": [
+          "roles",
+          "runs"
+        ],
+        "properties": {
+          "roles": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRole"
+            }
+          },
+          "running": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/AgentRunInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentRunInfo"
+            }
+          }
+        }
+      },
+      "AgentRunRequest": {
+        "type": "object",
+        "description": "POST /api/agent/run and the WS run frame.",
+        "required": [
+          "task",
+          "mode"
+        ],
+        "properties": {
+          "task": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "single",
+              "multi"
+            ]
+          },
+          "max_steps": {
+            "type": "integer"
+          },
+          "max_rounds": {
+            "type": "integer"
+          },
+          "auto_confirm": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentRunAccepted": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "accepted"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string"
+          },
+          "accepted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentStopRequest": {
+        "type": "object",
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      },
+      "AgentStopResult": {
+        "type": "object",
+        "required": [
+          "run_id",
+          "stopped"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "stopped": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentConfirmRequest": {
+        "type": "object",
+        "description": "POST /api/agent/confirm and the WS confirm frame.",
+        "required": [
+          "request_id",
+          "choice"
+        ],
+        "properties": {
+          "run_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "choice": {
+            "type": "string",
+            "enum": [
+              "reject",
+              "once",
+              "session"
+            ]
+          }
+        }
+      },
+      "AgentConfirmAck": {
+        "type": "object",
+        "required": [
+          "accepted"
+        ],
+        "properties": {
+          "accepted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "AgentStateResponse": {
+        "type": "object",
+        "description": "GET /api/agent/state",
+        "required": [
+          "running",
+          "status",
+          "task",
+          "mode",
+          "events"
+        ],
+        "properties": {
+          "running": {
+            "type": "boolean"
+          },
+          "run_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string"
+          },
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/AgentEvent"
+            }
+          },
+          "pending_confirmation": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ConfirmRequestPayload"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "RunArtifacts": {
+        "type": "object",
+        "required": [
+          "run_dir",
+          "screenshots",
+          "dom_snapshots",
+          "logs"
+        ],
+        "properties": {
+          "run_dir": {
+            "type": "string"
+          },
+          "screenshots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "dom_snapshots": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "logs": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "ArtifactsResponse": {
+        "type": "object",
+        "description": "GET /api/observability/artifacts",
+        "required": [
+          "runs"
+        ],
+        "properties": {
+          "runs": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RunArtifacts"
+            }
+          }
+        }
+      },
+      "AssistantDeltaPayload": {
+        "type": "object",
+        "required": [
+          "text"
+        ],
+        "properties": {
+          "text": {
+            "type": "string"
+          },
+          "type": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          }
+        }
+      },
+      "ToolCallPayload": {
+        "type": "object",
+        "required": [
+          "call_id",
+          "tool"
+        ],
+        "properties": {
+          "call_id": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "risk": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ToolResultPayload": {
+        "type": "object",
+        "required": [
+          "call_id",
+          "tool",
+          "ok"
+        ],
+        "properties": {
+          "call_id": {
+            "type": "string"
+          },
+          "tool": {
+            "type": "string"
+          },
+          "ok": {
+            "type": "boolean"
+          },
+          "error_code": {
+            "type": "string",
+            "nullable": true
+          },
+          "duration_ms": {
+            "type": "integer"
+          },
+          "risk": {
+            "type": "string"
+          },
+          "summary": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "attempts": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "StateUpdatePayload": {
+        "type": "object",
+        "properties": {
+          "project_state": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProjectState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "snapshot": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/RecoverySnapshot"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "message": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "MemoryUpdatePayload": {
+        "type": "object",
+        "properties": {
+          "memories": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/MemoryEntry"
+            }
+          },
+          "message": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentUpdatePayload": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "role": {
+            "type": "string",
+            "nullable": true
+          },
+          "status": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "tools_used": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "run_id": {
+            "type": "string"
+          },
+          "task": {
+            "type": "string"
+          },
+          "choice": {
+            "type": "string"
+          },
+          "stopped": {
+            "type": "boolean"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "ConfirmRequestPayload": {
+        "type": "object",
+        "description": "Confirmation the console must answer (the backend also sends 'id').",
+        "required": [
+          "tool",
+          "risk",
+          "choices"
+        ],
+        "properties": {
+          "request_id": {
+            "type": "string"
+          },
+          "id": {
+            "type": "string"
+          },
+          "run_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "tool": {
+            "type": "string"
+          },
+          "risk": {
+            "type": "string"
+          },
+          "command": {
+            "type": "string"
+          },
+          "cwd": {
+            "type": "string"
+          },
+          "impact": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "reasons": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "choices": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "reject",
+                "once",
+                "session"
+              ]
+            }
+          },
+          "arguments": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "created_at": {
+            "type": "string"
+          },
+          "expires_at": {
+            "type": "string",
+            "nullable": true
+          },
+          "message": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          }
+        }
+      },
+      "ErrorPayload": {
+        "type": "object",
+        "required": [
+          "code",
+          "message"
+        ],
+        "properties": {
+          "code": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "message_text": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "DonePayload": {
+        "type": "object",
+        "required": [
+          "status"
+        ],
+        "properties": {
+          "status": {
+            "type": "string"
+          },
+          "reason": {
+            "type": "string"
+          },
+          "steps": {
+            "type": "integer"
+          },
+          "tool_calls": {
+            "type": "integer"
+          },
+          "message": {
+            "type": "string"
+          },
+          "step": {
+            "type": "integer"
+          },
+          "type": {
+            "type": "string"
+          }
+        }
+      },
+      "AgentEventEnvelope": {
+        "type": "object",
+        "description": "Server -> client event frame (docs/api-protocol.md).",
+        "required": [
+          "event",
+          "timestamp",
+          "session_id",
+          "payload"
+        ],
+        "properties": {
+          "event": {
+            "type": "string",
+            "enum": [
+              "assistant_delta",
+              "tool_call",
+              "tool_result",
+              "state_update",
+              "memory_update",
+              "agent_update",
+              "confirm_request",
+              "error",
+              "done"
+            ]
+          },
+          "timestamp": {
+            "type": "string"
+          },
+          "session_id": {
+            "type": "string"
+          },
+          "payload": {
+            "type": "object",
+            "additionalProperties": true
+          },
+          "request_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "tool_call_id": {
+            "type": "string",
+            "nullable": true
+          },
+          "agent_id": {
+            "type": "string",
+            "nullable": true
+          }
+        }
+      }
+    }
+  }
+}

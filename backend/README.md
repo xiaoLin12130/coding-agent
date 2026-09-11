@@ -624,3 +624,212 @@ latter to stay deterministic.
 
 The web console (M8). `docs/runtime-agents.md` keeps all real execution behind
 the Executor, which the orchestrator respects: it holds no tools of its own.
+---
+
+# Console backend (M8)
+
+The Workbench needs three things the CLI cannot give it, and M8 adds exactly
+those: sessions and state it can read and change, a run it can watch live, and
+a confirmation a human can answer.
+
+| Module | Responsibility |
+| --- | --- |
+| `runtime.py` | `AgentRuntime` — one console-facing run: worker thread, event ring, stop button, confirmation queue |
+| `console_model.py` | the model the console drives: the real browser provider, wrapped in the M6 recovery |
+| `settings.py` | the settings document (provider, browser, working dir, safety, confirmation, thresholds, multi-agent) |
+| `api/console.py` | sessions, settings, logs, agents, observability, run control |
+| `api/ws.py` | the WebSocket protocol (M0 echo + the documented event envelope) |
+
+## The run is observable, stoppable and answerable
+
+* **observable** — the run happens on a worker thread and publishes
+  `AgentEvent`s; the WebSocket streams them and `GET /api/agent/state` replays
+  them, so a client that connects late still sees the whole run
+* **stoppable** — `POST /api/agent/stop` (or the `stop` frame) sets the flag
+  the agent loop already checks before every step
+* **answerable** — a high-risk call publishes a `confirm_request` and the
+  worker waits; `POST /api/agent/confirm` (or the `confirm` frame) answers it.
+  An unanswered prompt expires and is treated as a rejection, so a run can
+  never hang on a closed browser tab
+* **one at a time** — a second run is refused with 409, because the event ring,
+  the confirmation queue and the stop flag describe exactly one run
+
+## Confirmation policy
+
+| Policy | Behaviour |
+| --- | --- |
+| `ask` | every high-risk call waits for a human (default) |
+| `auto_once` | the runtime answers "once" itself (unattended runs) |
+| `deny` | the runtime always rejects |
+
+`once` is accepted as an alias for `auto_once` and normalised, so either
+spelling reads back as the canonical one.
+
+## Tool cards need correlation
+
+`tool_start` carries `call_id`, `tool`, `arguments` and `risk`;
+`tool_result` carries the same `call_id` plus `ok`, `error_code`, `risk`,
+`duration_ms` and `summary`. Ids are unique **for the whole run**
+(`<run>-<step>-<index>`), not per parse: with one call per step every id would
+otherwise be `call-1` and every card would collapse into one.
+
+## WebSocket
+
+Two families travel on one socket, because the M0 echo contract is already
+shipped:
+
+```jsonc
+// M0
+{"type": "chat", "content": "hello"}
+{"type": "message", "message": {...}}
+
+// console
+{"type": "run",  "task": "...", "mode": "single"|"multi"}
+{"type": "stop", "run_id": "..."}
+{"type": "confirm", "request_id": "...", "choice": "reject"|"once"|"session"}
+{"type": "snapshot"}
+```
+
+Server events use the documented envelope
+(`docs/api-protocol.md`): `{event, timestamp, session_id, payload}` plus the
+optional correlation ids (`request_id`, `tool_call_id`, `agent_id`) at the top
+level, so a client can key on them without digging into the payload.
+
+## REST added in M8
+
+| Path | Purpose |
+| --- | --- |
+| `POST /api/sessions` / `POST /api/sessions/{id}/archive` | new and archived sessions |
+| `GET/PUT /api/settings` | the settings document |
+| `GET /api/logs` | the tool audit trail and the current run's events |
+| `GET /api/agents`, `GET /api/agent/state` | roles, running run, history |
+| `POST /api/agent/run` / `stop` / `confirm` | run control |
+| `GET /api/observability/artifacts` / `file` | screenshots, DOM snapshots and logs (`file` is restricted to the runs directory) |
+
+## Boundaries that did not move
+
+The console executes nothing directly. Every run goes through the same
+`AgentLoop`/`AgentOrchestrator`, so the M4 SafetyLayer and the Executor apply
+unchanged; a run's tool calls land in the same `runs/tool-calls.jsonl` audit
+log as the CLI's. The console cannot widen a role's tools either: the roles in
+`/api/settings` are read-only and always come from the code.
+
+---
+
+# Provider adapters (M9)
+
+How the agent reaches a model is an adapter behind a registry, so a new provider
+never touches `app/agents`:
+
+| Module | Responsibility |
+| --- | --- |
+| `app/providers/models.py` | `ProviderInfo` / `ProviderOption`: what a provider is, and what it needs |
+| `app/providers/registry.py` | `ProviderRegistry`, `default_registry()`, `build_model()` |
+| `app/providers/browser.py` | the shipped default: a web LLM through Playwright (M1 + M6 recovery) |
+| `app/providers/scripted.py` | offline replay of a plan file (tests, evaluation, CLI) |
+| `app/providers/openai_compatible.py` | any `/chat/completions` endpoint over HTTP |
+
+```bash
+cd backend
+python -m app.providers.cli list
+python -m app.providers.cli show openai_compatible
+python -m app.providers.cli check scripted --option plan=plan.json --prompt "hi"
+```
+
+Choosing a provider is a settings change, not a code change:
+
+```jsonc
+{
+  "provider": {
+    "adapter": "openai_compatible",   // browser | scripted | openai_compatible
+    "model": "qwen2.5-coder",
+    "options": {"base_url": "http://127.0.0.1:8080/v1"}
+  }
+}
+```
+
+* `adapter` picks the registry entry; `name` stays the browser profile.
+* A **secret** option (an API key) is read from the environment
+  (`api_key_env`, default `OPENAI_API_KEY`) and is stripped before the settings
+  document is written.
+* The registry rejects an unknown option name instead of ignoring it, so a typo
+  is reported before a run starts. One document holds the options of every
+  adapter; the inactive ones are simply not passed to the active provider.
+* `provider.available` in `GET /api/settings` is the read-only catalog, derived
+  from the registry like the role list is derived from the code.
+* Saving a different provider drops the console's cached model, so the next run
+  uses what the page now shows.
+
+Adding one is an adapter plus one registration:
+
+```python
+from app.providers import ProviderInfo, register_provider
+
+INFO = ProviderInfo(name="my-model", kind="api", label="My model")
+
+@register_provider(INFO)
+def create(**options):
+    return MyModelClient(**options)
+```
+
+---
+
+# Evaluation (M9)
+
+`app/evaluation/` replays the golden sets through the **real** components —
+parser, SafetyLayer, Executor, AgentLoop, SessionManager — and turns the result
+into a pass/fail gate.
+
+| Module | Responsibility |
+| --- | --- |
+| `models.py` | cases, expectations, results, reports, thresholds |
+| `dataset.py` | loaders for the two golden files |
+| `parser_eval.py` | the parser golden set (exact match, per category, failure samples) |
+| `agent_eval.py` | the six scenarios' runner (throwaway workspace per case) |
+| `thresholds.py` | what a run must reach to count as a pass |
+| `report.py` | markdown + JSON report |
+| `runner.py` / `cli.py` | one call / one command to run everything |
+
+```bash
+cd backend
+python -m app.evaluation.cli run                       # both suites, writes runs/evaluation/<stamp>/
+python -m app.evaluation.cli run --suite parser --json
+python -m app.evaluation.cli run --out reports/m9      # exit 1 when a threshold fails
+```
+
+The data lives in `backend/evaluation/`: `parser_golden.jsonl` (50 cases over
+the eight categories docs/testing.md requires, plus a ninth for invented tool
+names) and `agent_cases.json` (15 scenarios over the six dimensions
+milestones/M9.md requires). A case carries its input **and its contract**; the
+harness reports the difference, never the other way round.
+
+| Dimension | What the cases prove |
+| --- | --- |
+| tool_selection | the tools the task needs, and no write for a read-only question |
+| tool_parsing | fences, JSON5 and prose-wrapped calls still execute |
+| task_completion | the result on disk is correct, proven by running the project's own check |
+| recovery | a failing model end is retried; a run stopped at the step limit resumes |
+| safety | a denied call, an outside path, a sensitive file and an unconfirmed command change nothing |
+| context_switching | the hard threshold rotates and continues, the soft one compacts |
+
+A case may record a **documented limitation** (`known_gap`): the expectation
+still describes today's behaviour, and the report lists the gap so it stays
+visible. The three recorded gaps:
+
+* a truncated second call after a complete one is dropped **without any issue**,
+  so the model is never told that only one of its two calls ran;
+* a call quoted as an **example** in prose is executed like a real one;
+* identical calls are returned twice (de-duplication is the loop's job, and the
+  loop only stops a repeat after the third identical step).
+
+Thresholds default to 100% of both suites plus coverage checks (categories,
+dimensions and case counts), so the regression gate in
+`tests/test_evaluation_regression.py` fails the moment a case stops matching —
+including the case of a known gap that got fixed, which must then be corrected
+in the dataset.
+
+The M9 regression suite also found a real M8 defect: the WebSocket mapping had
+no entry for the runtime's `done` and `error` events, so every run ended as an
+`agent_update` and no client could ever see a run finish or fail. The test that
+covered it waited forever for a frame that could not arrive. Both names are
+mapped now (`app/api/ws.py`) and guarded by tests.

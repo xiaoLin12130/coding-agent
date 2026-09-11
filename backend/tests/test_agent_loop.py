@@ -91,6 +91,39 @@ def test_a_tool_call_runs_and_feeds_the_next_turn(env) -> None:
     assert second_request.data["sections"]
 
 
+def test_tool_call_ids_are_unique_across_steps(env) -> None:
+    """A console pairs call/result by id; reusing one id collapses the cards."""
+    project, _executor, _sessions, _builder = env
+    (project / "a.txt").write_text("a", encoding="utf-8")
+    (project / "b.txt").write_text("b", encoding="utf-8")
+
+    result = loop_for(
+        env,
+        [
+            call("read_file", path="a.txt"),
+            call("read_file", path="b.txt"),
+            call("list_dir", path="."),
+            "done",
+        ],
+        repeat_threshold=9,
+    ).run("read a few files")
+
+    calls = [
+        event.data["call_id"]
+        for event in result.events
+        if event.type == "tool_start"
+    ]
+    results = [
+        event.data["call_id"]
+        for event in result.events
+        if event.type == "tool_result"
+    ]
+
+    assert len(calls) == 3
+    assert len(set(calls)) == 3, "every tool call needs its own id"
+    assert results == calls, "each result pairs with its own call"
+
+
 def test_multiple_calls_in_one_step_all_run(env) -> None:
     project, _executor, _sessions, _builder = env
     (project / "a.txt").write_text("a", encoding="utf-8")
@@ -504,7 +537,16 @@ def test_the_confirmation_hook_can_approve_a_call(env) -> None:
     assert result.tool_failures == 0
     results = [e for e in result.events if e.type == "tool_result"]
     assert any("approved" in event.message for event in results)
-    assert any(event.message.startswith("confirmation: once") for event in results)
+    # the confirmation's answer is an agent_update, NOT a tool_result: a result
+    # without a call id would make a console render a phantom card
+    answers = [
+        e for e in result.events if e.message.startswith("confirmation: once")
+    ]
+    assert answers and answers[0].type == "agent_update"
+    assert not any(
+        e.type == "tool_result" and e.data.get("call_id") is None and e.tool
+        for e in result.events
+    ), "every tool_result must carry the call it belongs to"
 
 
 def test_the_confirmation_hook_can_reject_a_call(env) -> None:
