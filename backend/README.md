@@ -379,3 +379,77 @@ call through the same Executor the model uses.
 **Not wired into the web console yet.** The confirmation data and its terminal
 rendering exist; the browser side needs the `confirm_request` event from
 `docs/api-protocol.md`, which belongs with the API-protocol work.
+---
+
+# Agent loop (M5)
+
+`app/agents/` runs the documented cycle:
+
+```text
+LLM -> ToolCallParser -> SafetyLayer -> Executor -> Tool Result -> Context -> LLM
+```
+
+| Module | Responsibility |
+| --- | --- |
+| `loop.py` | `AgentLoop` — the cycle and every bound it respects |
+| `llm.py` | model clients: `ScriptedModel`, `CallableModel`, `BrowserModel` |
+| `checkpoint.py` | `CheckpointStore` — durable run state, rewritten after every step |
+| `cli.py` | manual entry points |
+
+The loop never touches a file or a shell itself: every tool call goes through
+the M3 parser, the M4 SafetyLayer and the Executor, so it cannot bypass the
+chain even by accident.
+
+## Bounds
+
+| Bound | Behaviour |
+| --- | --- |
+| max steps | `max_steps` (default 25) ends the run with status `max_steps` |
+| timeout | a wall-clock budget ends it with `timeout` |
+| user interrupt | a `should_stop` callback is checked before every step → `interrupted` |
+| tool retry | only failures the Executor marks `retryable` are retried (a timeout, not a missing file) |
+| parse retry | unparsable output is re-asked with the M3 repair prompt, bounded |
+| loop detection | a repeating call pattern (including `A,B,A,B,…`) ends it with `loop` |
+| checkpoint | written after every step, so a crash leaves a resumable run |
+| confirmation | a hook answers `reject`/`once`/`session` before a risky call runs |
+
+## Context and history
+
+Each step rebuilds the context with the M2 builder (system, task, project
+state, memory, recent transcript, tool results, history summary). Tool results
+are also written to the session transcript with the `tool` role, so the model
+still sees earlier results two turns later — the context alone only carries the
+previous step's output.
+
+Tool output is DATA. It is wrapped in the untrusted marker and scanned for
+instruction-like content; only `model` and `user` output may be parsed as
+instructions.
+
+## Statuses
+
+`completed` · `max_steps` · `timeout` · `interrupted` · `blocked` (the model
+stopped after the SafetyLayer refused) · `loop` · `error`
+
+## CLI
+
+```bash
+cd backend
+
+cat > plan.json <<'JSON'
+{"replies": ["{\"name\": \"read_file\", \"arguments\": {\"path\": \"a.txt\"}}", "done"]}
+JSON
+
+python -m app.agents.cli run --task "read a.txt" --script plan.json --confirm once
+python -m app.agents.cli checkpoints
+python -m app.agents.cli resume --run-id <id>
+```
+
+`--script` supplies canned model replies so the loop can be exercised without
+a web LLM; every tool call still goes through parser, SafetyLayer and Executor.
+
+## Not in M5
+
+Multi-agent orchestration (Planner/Coder/Reviewer/…): `docs/runtime-agents.md`
+requires the single loop to be solid first. Session recovery across a context
+threshold, browser/login recovery and crash recovery are M6; M5 supplies the
+checkpoint they build on.

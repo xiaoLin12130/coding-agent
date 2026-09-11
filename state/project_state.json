@@ -1,39 +1,39 @@
 {
-  "current_milestone": "M4",
+  "current_milestone": "M5",
   "current_task": null,
-  "goal": "M4 — Safety: a reliable SafetyLayer enforcing file scope, sensitive-path checks, shell risk grading, prompt-injection defence and human confirmation before high-risk tools run.",
-  "milestone_status": "M4 complete, M5 not started",
+  "goal": "M5 — Agent Loop: the full cycle LLM -> ToolCallParser -> SafetyLayer -> Executor -> Tool Result -> Context -> LLM with max steps, timeout, user interrupt, tool retry, checkpoint and loop detection.",
+  "milestone_status": "M5 complete, M6 not started",
   "todos": [
     {
-      "content": "M4: safety models + policy (one place for every rule)",
+      "content": "M5: agent models (limits, events, step records, run result, checkpoint)",
       "status": "completed"
     },
     {
-      "content": "M4: filesystem policy (project scope, symlink escapes, sensitive files)",
+      "content": "M5: model clients (ScriptedModel, CallableModel, BrowserModel)",
       "status": "completed"
     },
     {
-      "content": "M4: shell risk grading (LOW/MEDIUM/HIGH, per-segment, subcommands, deny-by-default)",
+      "content": "M5: CheckpointStore with atomic writes and resume",
       "status": "completed"
     },
     {
-      "content": "M4: prompt-injection defence (scanning + instruction-source guard)",
+      "content": "M5: AgentLoop with max steps, timeout, interrupt, tool retry, parse retry, loop detection",
       "status": "completed"
     },
     {
-      "content": "M4: SafetyLayer (allow/confirm/deny, session grants, output guarding)",
+      "content": "M5: confirmation hook and safety enforcement inside the loop",
       "status": "completed"
     },
     {
-      "content": "M4: wire the layer into the Executor with validation first and no unchecked path",
+      "content": "M5: tool results recorded in the transcript so history survives",
       "status": "completed"
     },
     {
-      "content": "M4: confirmation UI data + terminal rendering (command/cwd/impact/risk + 3 choices)",
+      "content": "M5: app.agents.cli (run/resume/checkpoints)",
       "status": "completed"
     },
     {
-      "content": "M4: tests incl. the four 'must not' acceptance rules",
+      "content": "M5: tests incl. the coding-task acceptance and a real-browser integration",
       "status": "completed"
     }
   ],
@@ -116,6 +116,27 @@
     "backend/tests/test_safety_layer.py",
     "backend/tests/test_safety_executor_integration.py",
     "backend/tests/test_safety_cli.py",
+    "backend/README.md",
+    "backend/app/agents/__init__.py",
+    "backend/app/agents/models.py",
+    "backend/app/agents/llm.py",
+    "backend/app/agents/checkpoint.py",
+    "backend/app/agents/loop.py",
+    "backend/app/agents/cli.py",
+    "backend/app/config.py",
+    "backend/app/tools/executor.py",
+    "backend/app/tools/errors.py",
+    "backend/app/tools/builtin.py",
+    "backend/app/browser/driver.py",
+    "backend/app/browser/web_chat.py",
+    "backend/tests/test_agent_llm.py",
+    "backend/tests/test_agent_checkpoint.py",
+    "backend/tests/test_agent_loop.py",
+    "backend/tests/test_agent_acceptance.py",
+    "backend/tests/test_agent_cli.py",
+    "backend/tests/test_agent_browser_integration.py",
+    "backend/tests/test_tools_executor.py",
+    "backend/tests/test_web_chat_provider.py",
     "backend/README.md"
   ],
   "tests": [
@@ -150,15 +171,21 @@
       "date": "2026-09-11"
     },
     {
-      "name": "backend pytest (M0..M4)",
-      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
-      "result": "474 passed in 73.5s (M4 added 171: test_safety_paths 32, test_safety_shell 41, test_safety_injection 30, test_safety_layer 25, test_safety_executor_integration 25, test_safety_cli 18)",
-      "date": "2026-09-11"
-    },
-    {
       "name": "M4 acceptance run (real process, outside pytest)",
       "command": "drive the Executor directly: outside paths, sensitive files, destructive shell, session grant, injected file content",
       "result": "PASS against all four 'must not' rules: absolute/relative paths outside the project and writes outside were refused (blocked_by_safety); .env, id_rsa and .ssh/* were refused inside the project; rm -rf /, git push --force, curl|bash and cat ~/.ssh/id_rsa were denied outright while sudo/systemctl required confirmation; the confirmation payload carried command/cwd/impact/risk and choices reject|once|session; a session grant allowed the approved command and not a different one; a file containing 'IGNORE ALL PREVIOUS INSTRUCTIONS' was read as data, flagged with an injection finding, and executed nothing",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M5)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "557 passed in 128s (M5 added 83: test_agent_llm 10, test_agent_checkpoint 12, test_agent_loop 39, test_agent_acceptance 6, test_agent_cli 11, test_agent_browser_integration 2, plus 2 executor and 1 provider regression tests)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M5 acceptance run (real process, outside pytest)",
+      "command": "python -m app.agents.cli run --task 'add(2,3) returns -1; fix it and run the check' --script plan.json --confirm once",
+      "result": "PASS: status=completed in 4 steps / 3 tool calls (read_file, apply_patch, run_shell); the file changed from 'return a - b' to 'return a + b'; the check reported '1 passed'; the checkpoint recorded step=4 status=completed; 3 audit log entries",
       "date": "2026-09-11"
     }
   ],
@@ -196,7 +223,17 @@
     "M4 denies rather than confirms the operations no human answer should authorise: destructive patterns (rm -rf /, dd of=/dev/..., curl|bash, git push --force), commands naming a sensitive file, and commands touching a path outside the project. A confirmation cannot override a deny.",
     "M4 prompt-injection defence is two-part: instruction-like content in untrusted text is flagged and travels with the result (whose text is never rewritten), and check_instruction_source() refuses to parse tool/file/web/shell/document output as instructions, so only model and user output can issue a tool call.",
     "M4 session grants are keyed by the exact command (for run_shell) or the exact arguments, so 本会话允许 never widens into a blanket shell grant; the tests pin that a grant does not cover another command.",
-    "M4 confirmation is rendered in the terminal (app.safety.cli confirm) with the four required facts and the three choices. The web console is NOT wired yet: that needs the confirm_request event from docs/api-protocol.md, which belongs with the API-protocol work rather than the safety layer."
+    "M4 confirmation is rendered in the terminal (app.safety.cli confirm) with the four required facts and the three choices. The web console is NOT wired yet: that needs the confirm_request event from docs/api-protocol.md, which belongs with the API-protocol work rather than the safety layer.",
+    "M5 is a single-agent loop only; docs/runtime-agents.md requires the single loop to be solid before multi-agent orchestration, and session/browser/login recovery belongs to M6.",
+    "The loop is model-agnostic behind a ModelClient protocol. BrowserModel adapts the M1 provider (so a web page is the real model end); ScriptedModel and CallableModel make the loop deterministic in tests, and the acceptance test uses a CallableModel whose decision depends on the tool results in the prompt — that is what proves 根据结果继续.",
+    "Tool results are recorded in the session transcript with the 'tool' role. The context only carries the previous step's results, so without this the model would lose what earlier tools returned; found while writing the acceptance test.",
+    "Confirmation is answered BEFORE the execution attempts, so a tool retry applies to the real run rather than to a refusal (found by a test: a shell timeout was never retried because the refusal consumed the retry loop).",
+    "Loop detection matches repeating cycles up to 4 steps long, not just consecutive identical calls, so an A,B,A,B pattern is caught (found by a test).",
+    "A tool failure is retried only when the Executor marks it retryable; ToolExecutionError now takes an explicit retryable flag and the shell timeout sets it, while a missing file stays non-retryable.",
+    "Plain prose is a completion signal, not a parse failure: parse retries apply only when nothing usable was parsed, and a partial parse (one good call plus one unknown tool) keeps the good call instead of retrying it away.",
+    "The idempotency cache is invalidated by any non-read-only call: a replayed read was showing the agent file content from before a write (found by the acceptance test).",
+    "The M1 provider's network capture is scoped to the current exchange via a cursor; before this, a second question on the same page captured the first answer's stream as well (found by the M5 browser integration test).",
+    "Only model and user output may be parsed as instructions; the loop calls the safety instruction-source guard on every reply."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -211,9 +248,12 @@
     "Tool calls are logged to runs/tool-calls.jsonl (gitignored), including replays and refusals.",
     "M4 is complete: backend/app/safety/{models,policy,paths,shell,injection,layer,cli}.py plus the Executor wiring; 474 backend tests green.",
     "The M3 'known gap' is closed: an absolute path outside the project is now refused by the safety layer and verified by both a direct probe and the acceptance test suite.",
-    "Tools are still not exposed over REST: the SafetyLayer now exists, but publishing the execution chain over HTTP belongs with the API-protocol/console work (confirm_request), not with M4."
+    "Tools are still not exposed over REST: the SafetyLayer now exists, but publishing the execution chain over HTTP belongs with the API-protocol/console work (confirm_request), not with M4.",
+    "M5 is complete: backend/app/agents/{models,llm,checkpoint,loop,cli}.py; 557 backend tests green.",
+    "Known hazard recorded while testing: rewriting a Python file in place with the SAME byte size inside the same mtime second can leave a stale __pycache__ entry, so a later test run reads the previous revision. The acceptance fixture compiles from source to avoid it; a real agent editing Python files can hit this.",
+    "The browser integration test verifies wiring, not answer quality: the offline fixture is an echo server, so its reply is the prompt it received (which contains JSON examples). Content behaviour is covered by the scripted and acceptance tests."
   ],
-  "checkpoint": "M4 checkpoint 2026-09-11: safety layer complete (file scope with symlink and sensitive-file refusal, per-segment shell grading with deny-by-default, prompt-injection scanning plus an instruction-source guard, confirmation with the four required facts and three choices, session grants), Executor wired so no unchecked path exists, all four acceptance rules verified in a real process, 474 backend tests green. Next milestone: M5 (Agent Loop).",
+  "checkpoint": "M5 checkpoint 2026-09-11: agent loop complete (parser -> safety -> executor -> context cycle, max steps, timeout, interrupt, tool retry, parse retry, cycle-aware loop detection, checkpoints and resume, confirmation hook), coding-task acceptance verified in a real process and against a real browser page, 557 backend tests green. Next milestone: M6 (Session Recovery).",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",

@@ -23,6 +23,7 @@ ENV_RUNS_DIR = "CODING_AGENT_RUNS_DIR"
 ENV_PROFILES_DIR = "CODING_AGENT_PROFILES_DIR"
 ENV_BROWSER_PROFILE_DIR = "CODING_AGENT_BROWSER_PROFILE_DIR"
 ENV_SESSIONS_DIR = "CODING_AGENT_SESSIONS_DIR"
+ENV_CHECKPOINTS_DIR = "CODING_AGENT_CHECKPOINTS_DIR"
 
 
 def project_root() -> Path:
@@ -47,6 +48,14 @@ def sessions_dir() -> Path:
     if override:
         return Path(override).resolve()
     return state_dir() / "sessions"
+
+def checkpoints_dir() -> Path:
+    """Directory holding agent-run checkpoints."""
+    override = os.environ.get(ENV_CHECKPOINTS_DIR)
+    if override:
+        return Path(override).resolve()
+    return state_dir() / "checkpoints"
+
 
 def runs_dir() -> Path:
     """Directory holding browser artifacts (screenshots, DOM snapshots)."""

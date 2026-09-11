@@ -231,14 +231,23 @@ class BrowserDriver:
         except Exception:
             return
 
+    def network_cursor(self) -> int:
+        """Index of the next response; pass it as 'since' to ignore earlier ones."""
+        return len(self._responses)
+
     def network(
         self,
         url_patterns: list[str] | None = None,
         content_types: list[str] | None = None,
         finished_only: bool = False,
+        since: int = 0,
     ) -> list[CapturedResponse]:
         entries = []
-        for entry in self._responses:
+        for index, entry in enumerate(self._responses):
+            # 'since' is what keeps a second question on the same page from
+            # being answered with the first question's responses as well.
+            if index < since:
+                continue
             if url_patterns and not any(
                 re.search(pattern, entry.url) for pattern in url_patterns
             ):
@@ -268,14 +277,22 @@ class BrowserDriver:
             return ""
 
     def wait_for_request_finished(
-        self, url_patterns: list[str], timeout_ms: int = 2_000, poll_ms: int = 100
+        self,
+        url_patterns: list[str],
+        timeout_ms: int = 2_000,
+        poll_ms: int = 100,
+        since: int = 0,
     ) -> bool:
         waited = 0
         while waited < timeout_ms:
+            candidates = {
+                entry.url for index, entry in enumerate(self._responses) if index >= since
+            }
             if any(
                 re.search(pattern, url)
                 for pattern in url_patterns
                 for url in self._finished_urls
+                if url in candidates
             ):
                 return True
             self.wait(poll_ms)

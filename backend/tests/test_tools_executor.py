@@ -257,6 +257,48 @@ def test_non_idempotent_tool_is_never_replayed(executor, workspace) -> None:
     assert second.ok is False, "the second patch cannot match the replaced text"
 
 
+def test_a_write_invalidates_cached_reads(workspace) -> None:
+    """A replayed read must never show content from before a write."""
+    cwd, context = workspace
+    target = cwd / "a.txt"
+    target.write_text("before", encoding="utf-8")
+    executor = Executor(default_registry(), context)
+
+    first = executor.execute(call("read_file", path="a.txt"))
+    executor.execute(call("write_file", path="a.txt", content="after"))
+    second = executor.execute(call("read_file", path="a.txt"))
+
+    assert "before" in first.output
+    assert "after" in second.output, "the cached read was served after a write"
+    assert second.idempotent_replay is False
+
+
+def test_a_patch_invalidates_cached_reads(workspace) -> None:
+    cwd, context = workspace
+    target = cwd / "a.txt"
+    target.write_text("old text", encoding="utf-8")
+    executor = Executor(default_registry(), context)
+
+    executor.execute(call("read_file", path="a.txt"))
+    executor.execute(
+        call("apply_patch", path="a.txt", hunks=[{"old": "old", "new": "new"}])
+    )
+    after = executor.execute(call("read_file", path="a.txt"))
+
+    assert "new text" in after.output
+
+
+def test_reads_are_still_replayed_without_an_intervening_write(workspace) -> None:
+    cwd, context = workspace
+    (cwd / "a.txt").write_text("stable", encoding="utf-8")
+    executor = Executor(default_registry(), context)
+
+    executor.execute(call("read_file", path="a.txt"))
+    second = executor.execute(call("read_file", path="a.txt"))
+
+    assert second.idempotent_replay is True, "the cache still works when nothing changed"
+
+
 def test_replay_can_be_disabled(workspace) -> None:
     cwd, context = workspace
     (cwd / "a.txt").write_text("x", encoding="utf-8")

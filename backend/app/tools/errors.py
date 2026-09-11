@@ -27,7 +27,25 @@ class ToolValidationError(ToolError):
 
 
 class ToolExecutionError(ToolError):
+    """A tool ran but failed.
+
+    'retryable' is opt-in: a missing file will still be missing on the next
+    attempt, while a timeout or a transient I/O error may not be. Tools mark
+    the transient cases explicitly so the agent loop knows what is worth
+    retrying.
+    """
+
     code = "execution_failed"
+
+    def __init__(
+        self,
+        message: str,
+        details: dict | None = None,
+        retryable: bool = False,
+    ) -> None:
+        super().__init__(message)
+        self.details = details or {}
+        self.retryable = retryable
 
 
 class ConfirmationRequiredError(ToolError):

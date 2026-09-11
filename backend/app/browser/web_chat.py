@@ -39,6 +39,9 @@ class WebChatProvider(ProviderAdapter):
     ) -> None:
         super().__init__(driver, profile)
         self._last_timeline: CompletionTimeline | None = None
+        # Network responses seen before the current send: capture uses it so a
+        # later question never re-reads an earlier answer's stream.
+        self._capture_since = 0
 
     # -- required operations ----------------------------------------------
 
@@ -96,6 +99,7 @@ class WebChatProvider(ProviderAdapter):
                 f"profile '{self.name}' is not logged in; log in manually first"
             )
         page = self.driver.page
+        self._capture_since = self.driver.network_cursor()
         try:
             composer = page.locator(self.profile.input_selector).last
             composer.click()
@@ -219,7 +223,9 @@ class WebChatProvider(ProviderAdapter):
         if not patterns:
             return None
         self.driver.wait_for_request_finished(
-            patterns, timeout_ms=min(self.profile.completion.poll_interval_ms * 8, 4_000)
+            patterns,
+            timeout_ms=min(self.profile.completion.poll_interval_ms * 8, 4_000),
+            since=self._capture_since,
         )
         chunks: list[str] = []
         urls: list[str] = []
@@ -227,6 +233,7 @@ class WebChatProvider(ProviderAdapter):
             url_patterns=patterns,
             content_types=self.profile.network_content_types,
             finished_only=True,
+            since=self._capture_since,
         ):
             body = self.driver.read_body(entry)
             if not body:

@@ -70,6 +70,24 @@ def test_completion_timeline_reports_multiple_signals(driver, mock_profile) -> N
     assert timeline.duration_ms > 0
 
 
+def test_a_second_question_does_not_replay_the_first_answer(driver, mock_profile) -> None:
+    """The network capture must be scoped to the current exchange."""
+    provider = _provider(driver, mock_profile)
+    provider.open()
+
+    provider.send("first question")
+    provider.wait_until_complete(timeout_ms=20_000)
+    first = provider.capture_response()
+
+    provider.send("second question")
+    provider.wait_until_complete(timeout_ms=20_000)
+    second = provider.capture_response()
+
+    assert first.text == "Fixture reply to: first question"
+    assert second.text == "Fixture reply to: second question"
+    assert "first question" not in second.text, "the earlier answer leaked into this one"
+
+
 def test_capture_prefers_network_over_dom(driver, mock_profile) -> None:
     # The assistant selector points nowhere, so any text must come from the
     # network stream: this proves the documented capture priority.

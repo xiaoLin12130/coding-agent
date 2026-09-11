@@ -82,7 +82,11 @@ class Executor:
             )
             safety = SafetyLayer.for_project(working_dir)
         self.safety = safety
-        self._cache: dict[str, ToolResult] = {}
+        self._cache: dict[str, tuple[int, ToolResult]] = {}
+        # Bumped by every call that can change the world. A cached read is only
+        # replayed while this is unchanged, so a read taken before a write can
+        # never be served afterwards (that would show the agent stale content).
+        self._world = 0
         self._log: list[ToolCallLogEntry] = []
 
     # -- public API --------------------------------------------------------
@@ -124,7 +128,8 @@ class Executor:
 
             key = idempotency_key(call)
             if tool.spec.idempotent and self.replay_cache:
-                cached = self._cache.get(key)
+                entry = self._cache.get(key)
+                cached = entry[1] if entry is not None and entry[0] == self._world else None
                 if cached is not None:
                     replayed = cached.model_copy(
                         update={
@@ -161,7 +166,11 @@ class Executor:
                 finished_at=finished_at,
             )
             if tool.spec.idempotent and self.replay_cache:
-                self._cache[key] = result
+                self._cache[key] = (self._world, result)
+            if not self._is_read_only(call.name):
+                # Anything that may have changed the world invalidates every
+                # cached read.
+                self._world += 1
 
         except ValidationError as exc:
             result = self._failure(
@@ -210,6 +219,13 @@ class Executor:
         self, calls: list[ToolCall], confirmed: bool = False
     ) -> list[ToolResult]:
         return [self.execute(call, confirmed=confirmed) for call in calls]
+
+    def _is_read_only(self, name: str) -> bool:
+        policy = getattr(self.safety, "policy", None)
+        read_only = getattr(policy, "read_only_tools", None)
+        if read_only is None:  # pragma: no cover - a custom layer without policy
+            return name in ("list_dir", "read_file", "search")
+        return name in read_only
 
     # -- logging -----------------------------------------------------------
 

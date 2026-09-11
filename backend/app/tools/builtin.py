@@ -446,11 +446,15 @@ def build_default_registry(
                 timeout=args.timeout_ms / 1000,
             )
         except subprocess.TimeoutExpired as exc:
+            # A timeout is the one shell failure worth another attempt.
             raise ToolExecutionError(
-                "command timed out after " + str(args.timeout_ms) + " ms"
+                "command timed out after " + str(args.timeout_ms) + " ms",
+                retryable=True,
             ) from exc
         except OSError as exc:
-            raise ToolExecutionError("could not run the command: " + str(exc)) from exc
+            raise ToolExecutionError(
+                "could not run the command: " + str(exc), retryable=True
+            ) from exc
 
         duration_ms = int((time.monotonic() - started) * 1000)
         body = ""
