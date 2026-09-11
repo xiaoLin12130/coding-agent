@@ -83,25 +83,25 @@ describe("ObservabilityPanel", () => {
       client.emitEvent("tool_result", { call_id: "c1", tool: "read_file", ok: true, duration_ms: 5 });
     });
 
-    expect(screen.getByTestId("replay-status")).toHaveTextContent("live");
+    expect(screen.getByTestId("replay-status")).toHaveTextContent("实时");
 
     await user.click(screen.getByTestId("replay-reset"));
-    expect(screen.getByTestId("replay-status")).toHaveTextContent("replaying #3");
-    expect(screen.getByTestId("replay-summary")).toHaveTextContent("tool cards 1");
+    expect(screen.getByTestId("replay-status")).toHaveTextContent("回放 #3");
+    expect(screen.getByTestId("replay-summary")).toHaveTextContent("工具卡片 1");
 
     await user.click(screen.getByTestId("replay-prev"));
-    expect(screen.getByTestId("replay-status")).toHaveTextContent("replaying #2");
+    expect(screen.getByTestId("replay-status")).toHaveTextContent("回放 #2");
 
     await user.click(screen.getByTestId("replay-prev"));
-    expect(screen.getByTestId("replay-summary")).toHaveTextContent("tool cards 0");
+    expect(screen.getByTestId("replay-summary")).toHaveTextContent("工具卡片 0");
 
     expect(useAppStore.getState().replay.view.messages[0].content).toBe("one ");
 
     await user.click(screen.getByTestId("replay-prev"));
     await user.click(screen.getByTestId("replay-prev"));
-    expect(screen.getByTestId("replay-summary")).toHaveTextContent("messages 0");
+    expect(screen.getByTestId("replay-summary")).toHaveTextContent("回放消息 0");
 
     await user.click(screen.getByTestId("replay-stop"));
-    expect(screen.getByTestId("replay-status")).toHaveTextContent("live");
+    expect(screen.getByTestId("replay-status")).toHaveTextContent("实时");
   });
 });

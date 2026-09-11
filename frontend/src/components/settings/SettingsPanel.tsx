@@ -7,6 +7,13 @@ import { Empty, SectionTitle, Spinner, StatusPill } from "../common/Ui";
 
 const DOCUMENTED_POLICIES = ["ask", "auto_once", "deny"] as const;
 
+/** The wire values stay English; the select shows what they mean. */
+const POLICY_LABELS: Record<string, string> = {
+  ask: "每次都询问",
+  auto_once: "自动允许一次",
+  deny: "一律拒绝",
+};
+
 function Labeled({
   label,
   hint,
@@ -47,14 +54,13 @@ export function SettingsPanel() {
     return (
       <div className="flex flex-col gap-3" data-testid="settings-panel">
         <BackendOffline detail={settings.error} />
-        {settings.status === "loading" ? <Spinner label="Loading settings…" /> : <Empty>No settings.</Empty>}
+        {settings.status === "loading" ? <Spinner label="正在加载设置…" /> : <Empty>暂无设置。</Empty>}
         <button
           type="button"
           onClick={() => void loadSettings()}
           className="self-start rounded-lg border border-edge px-3 py-1 text-xs text-slate-300 hover:border-accent"
         >
-          Load settings
-        </button>
+          载入设置</button>
       </div>
     );
   }
@@ -85,7 +91,7 @@ export function SettingsPanel() {
           className="rounded-lg bg-accent px-3 py-1 text-xs font-medium text-white disabled:opacity-40"
           disabled={saveStatus === "loading"}
         >
-          {saveStatus === "loading" ? "Saving…" : "Save settings"}
+          {saveStatus === "loading" ? "保存中…" : "保存设置"}
         </button>
         <button
           type="button"
@@ -93,11 +99,10 @@ export function SettingsPanel() {
           onClick={() => void loadSettings()}
           className="rounded-lg border border-edge px-3 py-1 text-xs text-slate-300 hover:border-accent"
         >
-          Reload
-        </button>
-        {dirty && <StatusPill label="unsaved changes" tone="warn" testId="settings-dirty" />}
+          重新加载</button>
+        {dirty && <StatusPill label="有未保存的修改" tone="warn" testId="settings-dirty" />}
         {saveStatus === "ready" && !dirty && (
-          <StatusPill label="saved" tone="ok" testId="settings-saved" />
+          <StatusPill label="已保存" tone="ok" testId="settings-saved" />
         )}
         {saveStatus === "error" && (
           <StatusPill label={saveError ?? "save failed"} tone="bad" testId="settings-error" />
@@ -105,8 +110,8 @@ export function SettingsPanel() {
       </div>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Provider</SectionTitle>
-        <Labeled label="name">
+        <SectionTitle>模型提供方</SectionTitle>
+        <Labeled label="名称">
           <input
             data-testid="settings-provider-name"
             className={inputClass}
@@ -119,7 +124,7 @@ export function SettingsPanel() {
             }
           />
         </Labeled>
-        <Labeled label="url">
+        <Labeled label="地址">
           <input
             data-testid="settings-provider-url"
             className={inputClass}
@@ -144,9 +149,9 @@ export function SettingsPanel() {
               }))
             }
           />
-          verified
+          已验证
         </label>
-        <Labeled label="notes">
+        <Labeled label="说明">
           <textarea
             data-testid="settings-provider-notes"
             rows={2}
@@ -162,14 +167,14 @@ export function SettingsPanel() {
         </Labeled>
         {(draft.provider.profiles ?? []).length > 0 && (
           <p className="text-[10px] text-slate-500">
-            profiles: {(draft.provider.profiles ?? []).join(", ")}
+            可用配置：{(draft.provider.profiles ?? []).join(", ")}
           </p>
         )}
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Browser</SectionTitle>
-        <Labeled label="profile dir">
+        <SectionTitle>浏览器</SectionTitle>
+        <Labeled label="浏览器资料目录">
           <input
             data-testid="settings-browser-profile"
             className={inputClass}
@@ -182,7 +187,7 @@ export function SettingsPanel() {
             }
           />
         </Labeled>
-        <Labeled label="artifacts dir">
+        <Labeled label="工件目录">
           <input
             data-testid="settings-browser-artifacts"
             className={inputClass}
@@ -196,13 +201,13 @@ export function SettingsPanel() {
           />
         </Labeled>
         <p className="text-[10px] text-slate-500">
-          headless allowed: {String(draft.browser.headless_allowed)} — the browser runs headed by
-          policy (docs/browser.md), so the backend pins this to false.
+          允许无头模式：{String(draft.browser.headless_allowed)} —— 按策略（docs/browser.md）浏览器必须是有界面的，
+          因此后端固定为 false。
         </p>
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Working directory</SectionTitle>
+        <SectionTitle>工作目录</SectionTitle>
         <input
           data-testid="settings-working-dir"
           className={inputClass}
@@ -212,8 +217,8 @@ export function SettingsPanel() {
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Safety</SectionTitle>
-        <Labeled label="project root">
+        <SectionTitle>安全</SectionTitle>
+        <Labeled label="项目根目录">
           <input
             data-testid="settings-safety-root"
             className={inputClass}
@@ -226,7 +231,7 @@ export function SettingsPanel() {
             }
           />
         </Labeled>
-        <Labeled label="extra roots" hint="one path per line">
+        <Labeled label="额外允许的目录" hint="每行一个路径">
           <textarea
             data-testid="settings-safety-extra-roots"
             rows={2}
@@ -255,18 +260,18 @@ export function SettingsPanel() {
               }))
             }
           />
-          confirm high-risk operations
+          高风险操作需要确认
         </label>
         {(draft.safety.sensitive_names ?? []).length > 0 && (
           <p className="text-[10px] text-slate-500">
-            sensitive names: {(draft.safety.sensitive_names ?? []).join(", ")}
+            敏感文件名：{(draft.safety.sensitive_names ?? []).join(", ")}
           </p>
         )}
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Confirmation</SectionTitle>
-        <Labeled label="policy">
+        <SectionTitle>确认策略</SectionTitle>
+        <Labeled label="策略">
           <select
             data-testid="settings-policy"
             className={inputClass}
@@ -280,12 +285,12 @@ export function SettingsPanel() {
           >
             {policyOptions.map((policy) => (
               <option key={policy} value={policy}>
-                {policy}
+                {POLICY_LABELS[policy] ?? policy}
               </option>
             ))}
           </select>
         </Labeled>
-        <Labeled label="ttl seconds">
+        <Labeled label="确认超时（秒）">
           <input
             type="number"
             data-testid="settings-ttl"
@@ -300,15 +305,14 @@ export function SettingsPanel() {
           />
         </Labeled>
         <p className="text-[10px] text-slate-600">
-          ask = every high-risk call waits for the console; auto_once = the runtime auto-answers
-          “once”; deny = always reject.
+          ask = 每个高风险调用都等待控制台确认；auto_once = 运行时自动回答“仅一次”；deny = 一律拒绝。
         </p>
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Context thresholds</SectionTitle>
+        <SectionTitle>上下文阈值</SectionTitle>
         <div className="grid grid-cols-3 gap-2">
-          <Labeled label="soft ratio">
+          <Labeled label="软阈值比例">
             <input
               type="number"
               step="0.05"
@@ -326,7 +330,7 @@ export function SettingsPanel() {
               }
             />
           </Labeled>
-          <Labeled label="hard ratio">
+          <Labeled label="硬阈值比例">
             <input
               type="number"
               step="0.05"
@@ -344,7 +348,7 @@ export function SettingsPanel() {
               }
             />
           </Labeled>
-          <Labeled label="recent turns">
+          <Labeled label="保留最近轮数">
             <input
               type="number"
               data-testid="settings-soft-turns"
@@ -365,7 +369,7 @@ export function SettingsPanel() {
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Multi-agent</SectionTitle>
+        <SectionTitle>多智能体</SectionTitle>
         <label className="flex items-center gap-2 text-[11px] text-slate-400">
           <input
             type="checkbox"
@@ -378,10 +382,10 @@ export function SettingsPanel() {
               }))
             }
           />
-          enabled
+          启用
         </label>
         <div className="grid grid-cols-2 gap-2">
-          <Labeled label="max rounds">
+          <Labeled label="最大轮数">
             <input
               type="number"
               data-testid="settings-multi-rounds"
@@ -395,7 +399,7 @@ export function SettingsPanel() {
               }
             />
           </Labeled>
-          <Labeled label="stall threshold">
+          <Labeled label="停滞阈值">
             <input
               type="number"
               data-testid="settings-multi-stall"
@@ -417,14 +421,14 @@ export function SettingsPanel() {
           <ul data-testid="settings-roles" className="flex flex-col gap-1">
             {draft.multi_agent.roles.map((role) => (
               <li key={role.name} className="text-[11px] text-slate-400">
-                <span className="font-mono text-slate-200">{role.name}</span> · max {role.max_steps}{" "}
-                steps · {role.purpose}
+                <span className="font-mono text-slate-200">{role.name}</span> · 最多 {role.max_steps}{" "}
+                步 · {role.purpose}
               </li>
             ))}
           </ul>
         )}
         <p className="text-[10px] text-slate-600">
-          roles come from the runtime and are read-only here, exactly as the backend stores them.
+          角色来自运行时，这里只读显示，与后端存储完全一致。
         </p>
       </section>
     </form>

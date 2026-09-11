@@ -37,10 +37,10 @@ export function formatRelative(value: string | null | undefined, now = Date.now(
   const date = parseDate(value);
   if (!date) return "—";
   const seconds = Math.round((now - date.getTime()) / 1000);
-  if (seconds < 60) return seconds <= 0 ? "just now" : seconds + "s ago";
-  if (seconds < 3600) return Math.round(seconds / 60) + "m ago";
-  if (seconds < 86_400) return Math.round(seconds / 3600) + "h ago";
-  return Math.round(seconds / 86_400) + "d ago";
+  if (seconds < 60) return seconds <= 0 ? "刚刚" : seconds + " 秒前";
+  if (seconds < 3600) return Math.round(seconds / 60) + " 分钟前";
+  if (seconds < 86_400) return Math.round(seconds / 3600) + " 小时前";
+  return Math.round(seconds / 86_400) + " 天前";
 }
 
 export function truncate(text: string, limit = 120): string {
@@ -81,6 +81,62 @@ export function asText(value: unknown): string {
   } catch {
     return "[unreadable value]";
   }
+}
+
+/**
+ * Human labels for machine values.
+ *
+ * The backend speaks in short codes ("completed", "ok", "running"); the console
+ * is a Chinese UI, so every place that renders one of those codes goes through
+ * here instead of printing the code. An unknown code is shown as-is rather than
+ * hidden, so a new backend status is visible the day it appears.
+ */
+const STATUS_LABELS: Record<string, string> = {
+  ok: "成功",
+  ready: "就绪",
+  idle: "空闲",
+  completed: "已完成",
+  done: "已完成",
+  running: "运行中",
+  loading: "加载中",
+  checking: "检测中",
+  started: "已开始",
+  asking: "提问中",
+  stopping: "正在停止",
+  replaying: "回放中",
+  failed: "失败",
+  error: "出错",
+  blocked: "被阻止",
+  timeout: "超时",
+  max_steps: "步数用尽",
+  interrupted: "已中断",
+  loop: "检测到循环",
+  live: "实时",
+};
+
+const BACKEND_LABELS: Record<string, string> = {
+  online: "在线",
+  offline: "离线",
+  checking: "检测中",
+  unknown: "状态未知",
+};
+
+const CONNECTION_LABELS: Record<string, string> = {
+  connected: "已连接",
+  connecting: "连接中",
+  disconnected: "已断开",
+};
+
+export function statusLabel(status: string): string {
+  return STATUS_LABELS[status] ?? status;
+}
+
+export function backendLabel(status: string): string {
+  return "后端" + (BACKEND_LABELS[status] ?? status);
+}
+
+export function connectionLabel(status: string): string {
+  return CONNECTION_LABELS[status] ?? status;
 }
 
 /** Risk levels come from the backend as plain strings. */

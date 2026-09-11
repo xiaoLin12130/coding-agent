@@ -1,16 +1,10 @@
 import { useState } from "react";
 
-import { cn, formatDuration, formatJson, formatTime } from "../../lib/format";
+import { cn, formatDuration, formatJson, formatTime, statusLabel } from "../../lib/format";
 import type { ToolCallRecord } from "../../types/ui";
 import { CopyButton } from "../chat/CodeBlock";
 import { DiffView, parseUnifiedDiff } from "../chat/DiffView";
 import { RiskPill, StatusPill } from "../common/Ui";
-
-const STATUS_LABEL: Record<ToolCallRecord["status"], string> = {
-  running: "running",
-  ok: "ok",
-  failed: "failed",
-};
 
 /**
  * One Tool Card: tool, parameters, status, risk, duration and result summary.
@@ -43,7 +37,7 @@ export function ToolCard({ record, defaultOpen = false }: { record: ToolCallReco
         <span data-testid="tool-card-name" className="font-mono text-xs text-slate-100">
           {record.tool}
         </span>
-        <StatusPill label={STATUS_LABEL[record.status]} tone={tone} testId="tool-card-status" />
+        <StatusPill label={statusLabel(record.status)} tone={tone} testId="tool-card-status" />
         <RiskPill risk={record.risk} testId="tool-card-risk" />
         <span data-testid="tool-card-duration" className="text-[11px] text-slate-400">
           {formatDuration(record.duration_ms)}
@@ -59,7 +53,7 @@ export function ToolCard({ record, defaultOpen = false }: { record: ToolCallReco
           onClick={() => setOpen((value) => !value)}
           className="ml-auto rounded-md border border-edge px-2 py-0.5 text-[11px] text-slate-400 hover:border-accent hover:text-slate-200"
         >
-          {open ? "Hide" : "Details"}
+          {open ? "收起" : "详情"}
         </button>
       </header>
 
@@ -94,8 +88,8 @@ export function ToolCard({ record, defaultOpen = false }: { record: ToolCallReco
       {open && (
         <div className="border-t border-edge px-3 py-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] uppercase tracking-wide text-slate-500">Parameters</span>
-            {hasParams && <CopyButton text={params} label="Copy JSON" />}
+            <span className="text-[11px] uppercase tracking-wide text-slate-500">参数</span>
+            {hasParams && <CopyButton text={params} label="复制 JSON" />}
           </div>
           <pre className="scroll-thin mt-1 max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0b0e13] p-2 font-mono text-[11px] text-slate-300">
             {hasParams ? params : "no parameters"}

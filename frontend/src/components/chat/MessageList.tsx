@@ -72,16 +72,14 @@ function MessageBubble({
                 onClick={() => onRetry(message.content)}
                 className="rounded-md border border-edge px-2 py-0.5 text-[11px] text-slate-400 hover:border-accent hover:text-slate-200"
               >
-                Retry
-              </button>
+                重试</button>
               <button
                 type="button"
                 data-testid="message-edit"
                 onClick={() => onEdit(message.content)}
                 className="rounded-md border border-edge px-2 py-0.5 text-[11px] text-slate-400 hover:border-accent hover:text-slate-200"
               >
-                Edit
-              </button>
+                编辑</button>
             </>
           )}
         </div>
@@ -179,8 +177,7 @@ export function MessageList({
           }}
           className="absolute bottom-3 left-1/2 -translate-x-1/2 rounded-full border border-edge bg-panelAlt px-3 py-1 text-xs text-slate-300"
         >
-          Back to bottom
-        </button>
+          回到最新</button>
       )}
     </div>
   );

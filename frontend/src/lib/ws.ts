@@ -158,7 +158,7 @@ export function parseServerFrame(raw: unknown): ParsedFrame | null {
       kind: "error",
       error: {
         code: typeof error.code === "string" ? error.code : "unknown_error",
-        message: typeof error.message === "string" ? error.message : "Unspecified server error.",
+        message: typeof error.message === "string" ? error.message : "未指定的服务器错误。",
       },
     };
   }

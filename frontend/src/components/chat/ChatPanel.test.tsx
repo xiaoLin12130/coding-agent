@@ -28,7 +28,7 @@ describe("ChatPanel", () => {
     render(<ChatPanel />);
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Message"), "refactor the safety layer{Enter}");
+    await user.type(screen.getByLabelText("消息"), "refactor the safety layer{Enter}");
 
     await waitFor(() =>
       expect(client.sent).toContainEqual({
@@ -45,7 +45,7 @@ describe("ChatPanel", () => {
     const user = userEvent.setup();
 
     await user.click(screen.getByTestId("composer-mode-chat"));
-    await user.type(screen.getByLabelText("Message"), "ping{Enter}");
+    await user.type(screen.getByLabelText("消息"), "ping{Enter}");
 
     await waitFor(() => expect(client.sent).toContainEqual({ type: "ask", content: "ping" }));
   });
@@ -119,7 +119,7 @@ describe("ChatPanel", () => {
     expect(screen.getByTestId("tool-card-params")).toHaveTextContent("command=pytest -q");
 
     const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Details" }));
+    await user.click(screen.getByRole("button", { name: "详情" }));
     expect(screen.getAllByText(/pytest -q/).length).toBeGreaterThan(0);
   });
 
@@ -232,7 +232,7 @@ describe("ChatPanel", () => {
     render(<ChatPanel />);
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Message"), "first attempt{Enter}");
+    await user.type(screen.getByLabelText("消息"), "first attempt{Enter}");
     await waitFor(() => expect(client.sent).toHaveLength(1));
 
     await user.click(await screen.findByTestId("message-retry"));
@@ -245,10 +245,10 @@ describe("ChatPanel", () => {
     render(<ChatPanel />);
     const user = userEvent.setup();
 
-    await user.type(screen.getByLabelText("Message"), "edit me{Enter}");
+    await user.type(screen.getByLabelText("消息"), "edit me{Enter}");
     await user.click(await screen.findByTestId("message-edit"));
 
-    expect(screen.getByLabelText("Message")).toHaveValue("edit me");
+    expect(screen.getByLabelText("消息")).toHaveValue("edit me");
   });
 
   it("surfaces a protocol error frame as a notice without crashing", async () => {

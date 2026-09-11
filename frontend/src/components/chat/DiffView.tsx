@@ -96,7 +96,7 @@ export function DiffView({
       </div>
       <div className="scroll-thin max-h-96 overflow-auto font-mono text-[12px] leading-5">
         {lines.length === 0 ? (
-          <p className="px-3 py-2 text-slate-500">No changes to show.</p>
+          <p className="px-3 py-2 text-slate-500">没有可显示的改动。</p>
         ) : (
           lines.map((line, index) => (
             <div key={index} className={cn("flex gap-2 px-2", TONE[line.kind])}>

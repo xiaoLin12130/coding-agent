@@ -40,7 +40,7 @@ COMMON_RULES = (
 
 PLANNER = RoleSpec(
     name="planner",
-    purpose="Understand the goal, inspect the project, and split the work into steps.",
+    purpose="理解目标、查看项目，并把工作拆成步骤。",
     allowed_tools=READ_ONLY_TOOLS,
     max_steps=6,
     system_prompt=(
@@ -55,7 +55,7 @@ PLANNER = RoleSpec(
 
 CODER = RoleSpec(
     name="coder",
-    purpose="Implement the plan with the tools, then run the tests.",
+    purpose="用工具实现计划，然后运行测试。",
     allowed_tools=WRITE_TOOLS,
     max_steps=12,
     system_prompt=(
@@ -70,7 +70,7 @@ CODER = RoleSpec(
 
 REVIEWER = RoleSpec(
     name="reviewer",
-    purpose="Check the code, the tests and whether the task is actually complete.",
+    purpose="检查代码、测试，以及任务是否真的完成。",
     allowed_tools=VERIFY_TOOLS,
     max_steps=8,
     verdict_kind="review",
@@ -91,7 +91,7 @@ REVIEWER = RoleSpec(
 
 MEMORY_CURATOR = RoleSpec(
     name="memory_curator",
-    purpose="Decide what is worth remembering long-term and propose it.",
+    purpose="判断哪些信息值得长期记忆，并提出建议。",
     allowed_tools=MEMORY_TOOL,
     max_steps=3,
     system_prompt=(
@@ -107,7 +107,7 @@ MEMORY_CURATOR = RoleSpec(
 
 STATE_KEEPER = RoleSpec(
     name="state_keeper",
-    purpose="Record where the project now stands and save a checkpoint.",
+    purpose="记录项目当前状态并保存检查点。",
     allowed_tools=[*READ_ONLY_TOOLS, *STATE_TOOL],
     max_steps=4,
     system_prompt=(
@@ -121,7 +121,7 @@ STATE_KEEPER = RoleSpec(
 
 SAFETY_GUARD = RoleSpec(
     name="safety_guard",
-    purpose="Check the plan and the actions taken for risk and overreach.",
+    purpose="检查计划与已执行的动作是否存在风险或越权。",
     allowed_tools=READ_ONLY_TOOLS,
     max_steps=4,
     verdict_kind="safety",

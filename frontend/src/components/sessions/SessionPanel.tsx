@@ -35,23 +35,22 @@ export function SessionPanel({ onOpenSettings }: { onOpenSettings: () => void })
       className="flex w-72 shrink-0 flex-col gap-3 border-r border-edge bg-panel p-4"
     >
       <div className="flex items-center justify-between">
-        <h1 className="text-sm font-semibold tracking-wide text-slate-200">Sessions</h1>
+        <h1 className="text-sm font-semibold tracking-wide text-slate-200">会话</h1>
         <button
           type="button"
           data-testid="new-session"
           onClick={() => void newSession()}
           className="rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent"
         >
-          New
-        </button>
+          新建</button>
       </div>
 
       <input
         type="search"
         value={query}
         onChange={(event) => setSessionQuery(event.target.value)}
-        placeholder="Search sessions"
-        aria-label="Search sessions"
+        placeholder="搜索会话"
+        aria-label="搜索会话"
         className="w-full rounded-lg border border-edge bg-surface px-3 py-2 text-sm placeholder:text-slate-500 focus:border-accent focus:outline-none"
       />
 
@@ -62,13 +61,12 @@ export function SessionPanel({ onOpenSettings }: { onOpenSettings: () => void })
           checked={archivedVisible}
           onChange={(event) => setArchivedVisible(event.target.checked)}
         />
-        show archived
-      </label>
+        显示已归档</label>
 
       <BackendOffline detail={sessions.error} />
 
       <div className="scroll-thin -mx-1 flex-1 overflow-y-auto px-1">
-        {sessions.status === "loading" && items.length === 0 && <Spinner label="Loading sessions…" />}
+        {sessions.status === "loading" && items.length === 0 && <Spinner label="正在加载会话…" />}
         {sessions.status === "error" && items.length === 0 && (
           <Empty>No sessions: {sessions.error}</Empty>
         )}
@@ -94,31 +92,30 @@ export function SessionPanel({ onOpenSettings }: { onOpenSettings: () => void })
                 >
                   <span className="block truncate text-sm">{session.title || session.id}</span>
                   <span className="mt-0.5 flex items-center gap-2 text-[11px] text-slate-500">
-                    <span>{session.message_count} msg</span>
-                    <span>· {session.turn_count} turn</span>
+                    <span>{session.message_count} 条消息</span>
+                    <span>· {session.turn_count} 轮</span>
                     <span>· {formatRelative(session.updated_at)}</span>
                   </span>
                   {session.archived && (
                     <span className="mt-1 inline-block">
-                      <StatusPill label="archived" tone="warn" />
+                      <StatusPill label="已归档" tone="warn" />
                     </span>
                   )}
                   {session.rotated_from && (
                     <span className="mt-1 block truncate text-[10px] text-slate-600">
-                      rotated from {truncate(session.rotated_from, 28)}
+                      接续自 {truncate(session.rotated_from, 28)}
                     </span>
                   )}
                 </button>
                 {!session.archived && (
                   <button
                     type="button"
-                    title="Archive this session"
+                    title="归档此会话"
                     data-testid="archive-session"
                     onClick={() => void archiveSession(session.id)}
                     className="rounded-lg border border-transparent px-2 text-[11px] text-slate-500 opacity-0 hover:border-edge hover:text-slate-200 group-hover:opacity-100"
                   >
-                    Archive
-                  </button>
+                    归档</button>
                 )}
               </li>
             );
@@ -126,7 +123,7 @@ export function SessionPanel({ onOpenSettings }: { onOpenSettings: () => void })
         </ul>
 
         {visible.length === 0 && sessions.status !== "loading" && (
-          <Empty>No matching session.</Empty>
+          <Empty>没有匹配的会话。</Empty>
         )}
       </div>
 
@@ -134,22 +131,22 @@ export function SessionPanel({ onOpenSettings }: { onOpenSettings: () => void })
         data-testid="provider-card"
         className="rounded-lg border border-edge bg-panelAlt p-3 text-xs text-slate-400"
       >
-        <p className="font-medium text-slate-300">Provider</p>
+        <p className="font-medium text-slate-300">模型提供方</p>
         {provider ? (
           <dl className="mt-1 flex flex-col gap-0.5">
             <div className="flex items-center justify-between gap-2">
-              <dt>name</dt>
+              <dt>名称</dt>
               <dd data-testid="provider-name" className="truncate font-mono text-slate-200">
                 {provider.name || "—"}
               </dd>
             </div>
             <div className="flex items-center justify-between gap-2">
-              <dt>url</dt>
+              <dt>地址</dt>
               <dd className="truncate font-mono text-slate-300">{provider.url || "—"}</dd>
             </div>
             <div className="mt-1 flex items-center gap-2">
               <StatusPill
-                label={provider.verified ? "verified" : "unverified"}
+                label={provider.verified ? "已验证" : "未验证"}
                 tone={provider.verified ? "ok" : "warn"}
                 testId="provider-verified"
               />
@@ -161,7 +158,7 @@ export function SessionPanel({ onOpenSettings }: { onOpenSettings: () => void })
             </div>
           </dl>
         ) : (
-          <p className="mt-1">{settings.status === "error" ? settings.error : "Loading…"}</p>
+          <p className="mt-1">{settings.status === "error" ? settings.error : "加载中…"}</p>
         )}
 
         <button
@@ -170,8 +167,7 @@ export function SessionPanel({ onOpenSettings }: { onOpenSettings: () => void })
           onClick={onOpenSettings}
           className="mt-3 w-full rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent"
         >
-          Settings
-        </button>
+          设置</button>
       </section>
     </aside>
   );

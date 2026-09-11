@@ -43,7 +43,7 @@ export function MemoryPanel() {
           data-testid="memory-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search memory"
+          placeholder="搜索记忆"
           aria-label="Search memory"
           className="flex-1 rounded-lg border border-edge bg-surface px-3 py-1.5 text-xs placeholder:text-slate-500 focus:border-accent focus:outline-none"
         />
@@ -53,8 +53,7 @@ export function MemoryPanel() {
           onClick={() => void loadMemory()}
           className="rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent"
         >
-          Reload
-        </button>
+          重新加载</button>
       </div>
 
       <label className="flex items-center gap-2 text-[11px] text-slate-500">
@@ -64,14 +63,13 @@ export function MemoryPanel() {
           checked={sensitiveOnly}
           onChange={(event) => setSensitiveOnly(event.target.checked)}
         />
-        sensitive only
-      </label>
+        只看敏感项</label>
 
-      {memory.status === "loading" && entries.length === 0 && <Spinner label="Loading memory…" />}
+      {memory.status === "loading" && entries.length === 0 && <Spinner label="正在加载记忆…" />}
       {memory.status === "error" && entries.length === 0 && <Empty>{memory.error}</Empty>}
 
       <p className="text-[11px] text-slate-500">
-        {visible.length} of {entries.length} entries
+        {visible.length} / {entries.length} 条
       </p>
 
       <ul data-testid="memory-list" className="flex flex-col gap-2">
@@ -92,7 +90,7 @@ export function MemoryPanel() {
                     {open ? entry.namespace : truncate(entry.value, 60)}
                   </span>
                 </span>
-                {entry.sensitive && <StatusPill label="sensitive" tone="warn" testId="memory-sensitive" />}
+                {entry.sensitive && <StatusPill label="敏感" tone="warn" testId="memory-sensitive" />}
               </button>
 
               {open && (
@@ -104,17 +102,17 @@ export function MemoryPanel() {
                     <CopyButton text={entry.value} />
                   </div>
                   <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-[11px] text-slate-500">
-                    <dt>namespace</dt>
+                    <dt>命名空间</dt>
                     <dd className="font-mono text-slate-300">{entry.namespace}</dd>
-                    <dt>source</dt>
+                    <dt>来源</dt>
                     <dd className="font-mono text-slate-300">{entry.source || "—"}</dd>
-                    <dt>source turn</dt>
+                    <dt>来源轮次</dt>
                     <dd className="font-mono text-slate-300">{entry.source_turn ?? "—"}</dd>
-                    <dt>updated by</dt>
+                    <dt>更新者</dt>
                     <dd className="font-mono text-slate-300">{entry.updated_by ?? "—"}</dd>
-                    <dt>created</dt>
+                    <dt>创建时间</dt>
                     <dd className="font-mono text-slate-300">{formatDateTime(entry.created_at)}</dd>
-                    <dt>updated</dt>
+                    <dt>更新时间</dt>
                     <dd className="font-mono text-slate-300">{formatDateTime(entry.updated_at)}</dd>
                   </dl>
                   <p className="mt-2 text-[10px] text-slate-600">
@@ -128,7 +126,7 @@ export function MemoryPanel() {
         })}
       </ul>
 
-      {visible.length === 0 && <Empty>No memory entry matches.</Empty>}
+      {visible.length === 0 && <Empty>没有匹配的记忆条目。</Empty>}
     </div>
   );
 }

@@ -1,43 +1,27 @@
 {
-  "current_milestone": "M12",
+  "current_milestone": "M13",
   "current_task": null,
-  "goal": "M12 — Real-environment hardening: run the agent against a real web LLM from the console on a real project, record every defect that surfaced, and fix them.",
-  "milestone_status": "M0..M12 complete (M12 = real-environment hardening)",
+  "goal": "M13 — Chinese console: every user-facing string in the Web UI is Chinese, with the wire values unchanged.",
+  "milestone_status": "M0..M12 complete; console localised to Chinese (M13)",
   "todos": [
     {
-      "content": "M11: ask the model from the console and stream the answer back (REST + WS + UI)",
+      "content": "M13: translate the console shell, panels, tabs, buttons and empty states to Chinese",
       "status": "completed"
     },
     {
-      "content": "M11/M12: fix the streaming latency (a question took the full 180 s timeout)",
+      "content": "M13: add status/label helpers so machine codes never reach the screen untranslated",
       "status": "completed"
     },
     {
-      "content": "M12: one browser thread owns the Playwright session (second run used to crash)",
+      "content": "M13: translate the runtime's display text (role purposes, rotation title) without touching prompts",
       "status": "completed"
     },
     {
-      "content": "M12: capture the reply exactly (code-block indentation, page chrome)",
+      "content": "M13: update the tests that asserted on English UI text",
       "status": "completed"
     },
     {
-      "content": "M12: clipboard paste race + long-prompt fallback",
-      "status": "completed"
-    },
-    {
-      "content": "M12: run_shell timeout must kill the process tree (a spawned server froze a run)",
-      "status": "completed"
-    },
-    {
-      "content": "M12: bounded LOOP WARNING before a repeated call ends the run",
-      "status": "completed"
-    },
-    {
-      "content": "M12: transcript clipping so the context stops rotating every step",
-      "status": "completed"
-    },
-    {
-      "content": "M12: live test - build a library management system through the console UI",
+      "content": "M13: verify by dumping the rendered text of every tab in a real browser",
       "status": "completed"
     }
   ],
@@ -204,7 +188,29 @@
     "frontend/src/lib/ws.ts",
     "frontend/src/lib/events.ts",
     "frontend/src/store/useAppStore.ts",
-    "frontend/src/components/chat/ChatComposer.tsx"
+    "frontend/src/components/chat/ChatComposer.tsx",
+    "frontend/src/lib/format.ts",
+    "frontend/src/components/TopBar.tsx",
+    "frontend/src/components/workbench/WorkbenchPanel.tsx",
+    "frontend/src/components/chat/ChatPanel.tsx",
+    "frontend/src/components/chat/ConnectionBadge.tsx",
+    "frontend/src/components/chat/CodeBlock.tsx",
+    "frontend/src/components/chat/DiffView.tsx",
+    "frontend/src/components/chat/MessageList.tsx",
+    "frontend/src/components/common/BackendOffline.tsx",
+    "frontend/src/components/common/Ui.tsx",
+    "frontend/src/components/sessions/SessionPanel.tsx",
+    "frontend/src/components/settings/SettingsPanel.tsx",
+    "frontend/src/components/state/AgentsPanel.tsx",
+    "frontend/src/components/state/FilesPanel.tsx",
+    "frontend/src/components/state/LogsPanel.tsx",
+    "frontend/src/components/state/MemoryPanel.tsx",
+    "frontend/src/components/state/ProjectStateView.tsx",
+    "frontend/src/components/state/TerminalPanel.tsx",
+    "frontend/src/components/tools/ConfirmationCard.tsx",
+    "frontend/src/components/tools/ToolCard.tsx",
+    "frontend/src/components/observability/ObservabilityPanel.tsx",
+    "backend/tests/manual/ui_text_dump.py"
   ],
   "tests": [
     {
@@ -344,6 +350,12 @@
       "command": "cd frontend && npx tsc --noEmit && npm test ; cd backend && python -m app.evaluation.cli run",
       "result": "0 type errors, 66 frontend tests passed; evaluation PASS (parser 50/50, agent 15/15)",
       "date": "2026-09-11"
+    },
+    {
+      "name": "console localisation check (real browser, every tab)",
+      "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/ui_text_dump.py",
+      "result": "dumps the rendered text of all nine tabs plus the shell, session list and chat into runs-adjacent ui-text-dump.json; the only English left is DATA (tool names, file paths, backend messages, model output), not UI chrome",
+      "date": "2026-09-11"
     }
   ],
   "failures": [
@@ -446,7 +458,10 @@
     "Before a repeated tool call ENDS a run, the loop injects one bounded LOOP WARNING into the next prompt (repeat_threshold still applies). Repeating a call that already returned this exact result cannot change anything, and the live model needed to be told.",
     "The console's default step budget is 40, not the loop's 25: a real project task (read, write several files, run a test, fix it, run again) does not fit in 25, and a live run hit the limit exactly while fixing its own broken test.",
     "The transcript section clips each message to 1200 characters. An assistant message carries its whole tool call, so a few 5 KB file writes filled the 28 000-character budget by themselves and every step rotated the session, losing the tool result the model was supposed to react to.",
-    "The M12 findings are recorded, not hidden: the web model is unreliable at large structured edits (two consecutive invalid-JSON replies ended runs) and the project it was asked to build is unfinished. The execution chain (parser -> safety -> executor -> loop -> console) held up; the limitations are the model and the site."
+    "The M12 findings are recorded, not hidden: the web model is unreliable at large structured edits (two consecutive invalid-JSON replies ended runs) and the project it was asked to build is unfinished. The execution chain (parser -> safety -> executor -> loop -> console) held up; the limitations are the model and the site.",
+    "The console is a Chinese UI, but the WIRE stays English: tool names, event names, settings keys and enum values (single/multi, ask/auto_once/deny, reject/once/session) are never translated, because they are protocol and storage values. Display goes through statusLabel/backendLabel/connectionLabel in lib/format.ts, and a select shows a Chinese label while sending the English value.",
+    "Backend display text was translated where the console shows it verbatim (role purposes, the rotation session title), while the SYSTEM PROMPTS that drive the model were left exactly as they are: those are behaviour, not chrome.",
+    "The localisation was verified by rendering the real UI in a browser and dumping the text of every tab, not by grepping the source: a string inside a conditional or a data array would survive a grep and still reach the screen."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -491,5 +506,5 @@
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",
-  "git_head": "1935ef1811907134a5868400b31ef1a3f5ac50f8"
+  "git_head": "0fa2e67d83ae70c4ad126beadc551318fc54e0b8"
 }

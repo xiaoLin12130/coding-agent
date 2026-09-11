@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { api } from "../../api/client";
 import { eventLabel } from "../../lib/events";
-import { basename, formatDuration, formatTime } from "../../lib/format";
+import { basename, formatDuration, formatTime, statusLabel } from "../../lib/format";
 import { selectTimeline, useAppStore } from "../../store/useAppStore";
 import { BackendOffline } from "../common/BackendOffline";
 import { CopyButton } from "../chat/CodeBlock";
@@ -72,17 +72,16 @@ export function ObservabilityPanel() {
               onClick={() => void loadArtifacts()}
               className="rounded-md border border-edge px-2 py-0.5 text-[11px] text-slate-400 hover:border-accent"
             >
-              Reload
-            </button>
+              重新加载</button>
           }
         >
-          Artifact runs ({runs.length})
+          工件运行（{runs.length}）
         </SectionTitle>
 
-        {artifacts.status === "loading" && runs.length === 0 && <Spinner label="Loading artifacts…" />}
+        {artifacts.status === "loading" && runs.length === 0 && <Spinner label="正在加载工件…" />}
         {artifacts.status === "error" && runs.length === 0 && <Empty>{artifacts.error}</Empty>}
         {artifacts.status !== "loading" && runs.length === 0 && (
-          <Empty>No browser run has written artifacts yet.</Empty>
+          <Empty>还没有浏览器运行产出工件。</Empty>
         )}
 
         <ul data-testid="artifact-runs" className="flex flex-col gap-1">
@@ -103,8 +102,8 @@ export function ObservabilityPanel() {
               >
                 <span className="block truncate font-mono text-slate-200">{basename(run.run_dir)}</span>
                 <span className="block text-slate-500">
-                  {run.screenshots.length} screenshot · {run.dom_snapshots.length} DOM ·{" "}
-                  {run.logs.length} log
+                  {run.screenshots.length} 张截图 · {run.dom_snapshots.length} 个 DOM ·{" "}
+                  {run.logs.length} 个日志
                 </span>
               </button>
             </li>
@@ -114,9 +113,9 @@ export function ObservabilityPanel() {
 
       {active && (
         <section className="flex flex-col gap-2">
-          <SectionTitle>Screenshots ({active.screenshots.length})</SectionTitle>
+          <SectionTitle>截图（{active.screenshots.length}）</SectionTitle>
           {active.screenshots.length === 0 ? (
-            <Empty>No screenshot in this run.</Empty>
+            <Empty>本次运行没有截图。</Empty>
           ) : (
             <div data-testid="screenshot-list" className="grid grid-cols-2 gap-2">
               {active.screenshots.map((path) => (
@@ -136,9 +135,9 @@ export function ObservabilityPanel() {
             </div>
           )}
 
-          <SectionTitle>DOM snapshots ({active.dom_snapshots.length})</SectionTitle>
+          <SectionTitle>DOM 快照（{active.dom_snapshots.length}）</SectionTitle>
           {active.dom_snapshots.length === 0 ? (
-            <Empty>No DOM snapshot in this run.</Empty>
+            <Empty>本次运行没有 DOM 快照。</Empty>
           ) : (
             <ul data-testid="dom-snapshot-list" className="flex flex-col gap-1">
               {active.dom_snapshots.map((path) => (
@@ -153,7 +152,7 @@ export function ObservabilityPanel() {
                     {basename(path)}
                   </button>
                   {snapshotPath === path && snapshotText !== null && (
-                    <CopyButton text={snapshotText} label="Copy DOM" />
+                    <CopyButton text={snapshotText} label="复制 DOM" />
                   )}
                 </li>
               ))}
@@ -170,9 +169,9 @@ export function ObservabilityPanel() {
             </pre>
           )}
 
-          <SectionTitle>Run logs ({active.logs.length})</SectionTitle>
+          <SectionTitle>运行日志（{active.logs.length}）</SectionTitle>
           {active.logs.length === 0 ? (
-            <Empty>No log file in this run.</Empty>
+            <Empty>本次运行没有日志文件。</Empty>
           ) : (
             <ul data-testid="artifact-logs" className="flex flex-col gap-1">
               {active.logs.map((path) => (
@@ -186,9 +185,9 @@ export function ObservabilityPanel() {
       )}
 
       <section className="flex flex-col gap-2">
-        <SectionTitle>Tool history ({toolCalls.length})</SectionTitle>
+        <SectionTitle>工具历史（{toolCalls.length}）</SectionTitle>
         {toolCalls.length === 0 ? (
-          <Empty>No tool call in this session.</Empty>
+          <Empty>本次会话没有工具调用。</Empty>
         ) : (
           <ul data-testid="tool-history" className="flex flex-col gap-1">
             {toolCalls.map((tool) => (
@@ -198,7 +197,7 @@ export function ObservabilityPanel() {
               >
                 <span className="font-mono text-slate-200">{tool.tool}</span>
                 <StatusPill
-                  label={tool.status}
+                  label={statusLabel(tool.status)}
                   tone={tool.status === "ok" ? "ok" : tool.status === "failed" ? "bad" : "info"}
                 />
                 <StatusPill label={"risk: " + tool.risk} tone="neutral" />
@@ -211,9 +210,9 @@ export function ObservabilityPanel() {
       </section>
 
       <section className="flex flex-col gap-2">
-        <SectionTitle>Event history ({events.length})</SectionTitle>
+        <SectionTitle>事件历史（{events.length}）</SectionTitle>
         {events.length === 0 ? (
-          <Empty>No event has been received yet.</Empty>
+          <Empty>还没有收到任何事件。</Empty>
         ) : (
           <ul data-testid="observed-events" className="flex flex-col gap-1">
             {[...events].reverse().map((entry) => (
@@ -239,14 +238,13 @@ export function ObservabilityPanel() {
         <SectionTitle
           right={
             <StatusPill
-              label={replay.active ? "replaying #" + (replay.index + 1) : "live"}
+              label={replay.active ? "回放 #" + (replay.index + 1) : "实时"}
               tone={replay.active ? "info" : "ok"}
               testId="replay-status"
             />
           }
         >
-          Replay
-        </SectionTitle>
+          回放</SectionTitle>
 
         <div className="flex flex-wrap items-center gap-2">
           <button
@@ -256,8 +254,7 @@ export function ObservabilityPanel() {
             onClick={() => startReplay()}
             className="rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent disabled:opacity-40"
           >
-            Load recording
-          </button>
+            载入记录</button>
           <button
             type="button"
             data-testid="replay-prev"
@@ -265,7 +262,7 @@ export function ObservabilityPanel() {
             onClick={() => stepReplay(-1)}
             className="rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent disabled:opacity-40"
           >
-            ◀ Prev
+            ◀ 上一个
           </button>
           <button
             type="button"
@@ -274,7 +271,7 @@ export function ObservabilityPanel() {
             onClick={toggleReplayPlay}
             className="rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent disabled:opacity-40"
           >
-            {replay.playing ? "Pause" : "Play"}
+            {replay.playing ? "暂停" : "播放"}
           </button>
           <button
             type="button"
@@ -283,8 +280,7 @@ export function ObservabilityPanel() {
             onClick={() => stepReplay(1)}
             className="rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent disabled:opacity-40"
           >
-            Next ▶
-          </button>
+            下一个 ▶</button>
           <button
             type="button"
             data-testid="replay-stop"
@@ -292,8 +288,7 @@ export function ObservabilityPanel() {
             onClick={stopReplay}
             className="rounded-lg border border-edge px-2 py-1 text-[11px] text-slate-300 hover:border-accent disabled:opacity-40"
           >
-            Back to live
-          </button>
+            回到实时</button>
         </div>
 
         <input
@@ -309,17 +304,17 @@ export function ObservabilityPanel() {
 
         <p className="text-[11px] text-slate-500">
           {events.length === 0
-            ? "Nothing recorded yet: events arrive while a run streams."
-            : "Event " +
+            ? "还没有记录：运行期间会持续产生事件。"
+            : "事件 " +
               (replay.active ? replay.index + 1 : events.length) +
-              " of " +
+              " / " +
               events.length +
-              " — the chat, tool cards and project state re-render from the recording."}
+              " —— 对话、工具卡片与项目状态会按记录重新渲染。"}
         </p>
         {replay.active && (
           <p data-testid="replay-summary" className="text-[11px] text-slate-400">
-            replayed messages {timeline.messages.length} · tool cards {timeline.toolCalls.length} ·
-            status {timeline.runStatus}
+            回放消息 {timeline.messages.length} · 工具卡片 {timeline.toolCalls.length} ·
+            状态 {statusLabel(timeline.runStatus)}
           </p>
         )}
       </section>

@@ -19,7 +19,7 @@ export function ConfirmationDialog() {
       data-testid="confirm-dialog"
       role="dialog"
       aria-modal="true"
-      aria-label="Confirmation required"
+      aria-label="需要确认"
       className="absolute inset-x-0 bottom-0 z-20 border-t border-amber-900/70 bg-surface/95 p-3 backdrop-blur"
     >
       <div className="flex flex-col gap-2">

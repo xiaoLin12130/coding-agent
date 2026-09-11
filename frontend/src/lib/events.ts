@@ -18,6 +18,7 @@ import type {
   ToolCallRecord,
 } from "../types/ui";
 import type { ParsedFrame } from "./ws";
+import { statusLabel } from "./format";
 
 export function emptyTimeline(): TimelineState {
   return {
@@ -289,7 +290,7 @@ export function applyFrame(state: TimelineState, frame: ParsedFrame): TimelineSt
           id: "confirm-" + seq,
           role: "system" as const,
           content:
-            "Confirmation required for " + request.tool + " (" + request.risk + " risk).",
+            "需要确认：" + request.tool + " (" + request.risk + " risk).",
           created_at: frame.timestamp,
           seq,
         },
@@ -331,7 +332,7 @@ export function applyFrame(state: TimelineState, frame: ParsedFrame): TimelineSt
     }
 
     case "error": {
-      const notice = str(payload.code, "error") + ": " + str(payload.message, "Unspecified error.");
+      const notice = str(payload.code, "error") + ": " + str(payload.message, "未指定的错误。");
       return { ...base, notices: push(state.notices, notice, MAX_NOTICES) };
     }
 
@@ -341,7 +342,10 @@ export function applyFrame(state: TimelineState, frame: ParsedFrame): TimelineSt
       );
       const status = str(payload.status, "done");
       const reason = str(payload.reason, "");
-      const notice = reason === "" ? "Run " + status : "Run " + status + ": " + reason;
+      const notice =
+        reason === ""
+          ? "运行 " + statusLabel(status)
+          : "运行 " + statusLabel(status) + "：" + reason;
       return {
         ...base,
         messages,

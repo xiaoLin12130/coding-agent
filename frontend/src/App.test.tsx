@@ -35,9 +35,9 @@ describe("app shell", () => {
     expect(screen.getByTestId("panel-sessions")).toBeInTheDocument();
     expect(screen.getByTestId("panel-chat")).toBeInTheDocument();
     expect(screen.getByTestId("panel-workbench")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Sessions" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Chat" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Workbench" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "会话" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "对话" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "工作台" })).toBeInTheDocument();
   });
 
   it("reports the backend as online and shows the provider", async () => {
@@ -59,7 +59,7 @@ describe("app shell", () => {
     );
     const offline = screen.getAllByTestId("backend-offline");
     expect(offline.length).toBeGreaterThan(0);
-    expect(offline[0]).toHaveTextContent("Backend offline");
+    expect(offline[0]).toHaveTextContent("后端离线");
     // no invented sessions or messages
     expect(screen.queryAllByTestId("session-item")).toHaveLength(0);
     expect(screen.queryAllByTestId("message-assistant")).toHaveLength(0);

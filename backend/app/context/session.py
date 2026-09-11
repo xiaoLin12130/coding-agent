@@ -253,7 +253,7 @@ class SessionManager:
 
         # 4. open the new session
         new_id = new_session_id()
-        info = SessionInfo(id=new_id, title=title or f"continued from {old_id}", rotated_from=old_id)
+        info = SessionInfo(id=new_id, title=title or f"接续自 {old_id}", rotated_from=old_id)
         self._index.sessions.append(info)
         self._index.active_session_id = new_id
         self.transcript.path_for(new_id).touch()

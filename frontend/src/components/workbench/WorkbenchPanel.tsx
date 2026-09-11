@@ -32,6 +32,19 @@ const TABS: WorkbenchTab[] = [
   "Settings",
 ];
 
+/** Display names for the tab ids (the ids stay stable, they are test hooks). */
+const TAB_LABELS: Record<WorkbenchTab, string> = {
+  State: "状态",
+  Tools: "工具",
+  Memory: "记忆",
+  Files: "文件",
+  Terminal: "终端",
+  Logs: "日志",
+  Agents: "智能体",
+  Observe: "观测",
+  Settings: "设置",
+};
+
 function ToolsTab() {
   const toolCalls = useAppStore((state) => state.live.toolCalls);
   const pending = useAppStore((state) =>
@@ -41,12 +54,11 @@ function ToolsTab() {
   return (
     <div className="flex flex-col gap-3" data-testid="tools-tab">
       <p className="text-[11px] text-slate-500">
-        {toolCalls.length} tool call(s) in this session · {pending} waiting for confirmation
+        本次会话 {toolCalls.length} 次工具调用 · {pending} 项等待确认
       </p>
       {toolCalls.length === 0 ? (
         <p className="text-xs text-slate-500">
-          Tool cards appear as soon as a tool_call event arrives and pair with its tool_result by
-          call_id.
+          工具卡片会在 tool_call 事件到达时立即出现，并通过 call_id 与对应的 tool_result 配对。
         </p>
       ) : (
         <div className="flex flex-col gap-2">
@@ -80,7 +92,7 @@ export function WorkbenchPanel({
     >
       <header className="border-b border-edge px-4 py-3">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-semibold text-slate-200">Workbench</h2>
+          <h2 className="text-sm font-semibold text-slate-200">工作台</h2>
           <div className="flex items-center gap-2">
             {pending > 0 && (
               <span
@@ -96,12 +108,11 @@ export function WorkbenchPanel({
               onClick={() => void loadAll()}
               className="rounded-lg border border-edge px-3 py-1 text-xs text-slate-300 hover:border-accent"
             >
-              Refresh
-            </button>
+              刷新</button>
           </div>
         </div>
 
-        <nav className="mt-3 flex flex-wrap gap-1" aria-label="Workbench tabs">
+        <nav className="mt-3 flex flex-wrap gap-1" aria-label="工作台标签页">
           {TABS.map((entry) => (
             <button
               key={entry}
@@ -115,7 +126,7 @@ export function WorkbenchPanel({
                 (tab === entry ? "bg-panelAlt text-slate-100" : "text-slate-400 hover:text-slate-200")
               }
             >
-              {entry}
+              {TAB_LABELS[entry]}
             </button>
           ))}
         </nav>

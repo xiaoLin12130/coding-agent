@@ -88,7 +88,7 @@ describe("parseServerFrame - M0 family", () => {
   it("accepts an error frame and fills missing fields", () => {
     expect(parseServerFrame({ type: "error", error: {} })).toEqual({
       kind: "error",
-      error: { code: "unknown_error", message: "Unspecified server error." },
+      error: { code: "unknown_error", message: "未指定的服务器错误。" },
     });
   });
 

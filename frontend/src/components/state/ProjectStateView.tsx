@@ -6,7 +6,7 @@ import { BackendOffline } from "../common/BackendOffline";
 import { Empty, Field, SectionTitle, Spinner, StatusPill } from "../common/Ui";
 
 function CountOrList({ items, mono = false }: { items: unknown[]; mono?: boolean }) {
-  if (items.length === 0) return <span className="text-slate-500">none</span>;
+  if (items.length === 0) return <span className="text-slate-500">无</span>;
   return (
     <ul className="flex flex-col gap-1">
       {items.map((item, index) => (
@@ -50,14 +50,13 @@ export function ProjectStateView() {
       <div className="flex flex-col gap-3" data-testid="project-state-empty">
         <BackendOffline detail={backendError} />
         {backend !== "offline" &&
-          (timeline.running ? <Spinner label="Waiting for state_update…" /> : <Empty>No project state yet.</Empty>)}
+          (timeline.running ? <Spinner label="等待 state_update…" /> : <Empty>还没有项目状态。</Empty>)}
         <button
           type="button"
           onClick={() => void loadProjectState()}
           className="self-start rounded-lg border border-edge px-3 py-1 text-xs text-slate-300 hover:border-accent"
         >
-          Load project state
-        </button>
+          载入项目状态</button>
       </div>
     );
   }
@@ -76,42 +75,39 @@ export function ProjectStateView() {
           onClick={() => void loadProjectState()}
           className="rounded-lg border border-edge px-3 py-1 text-xs text-slate-300 hover:border-accent"
         >
-          Refresh
-        </button>
+          刷新</button>
         <button
           type="button"
           data-testid="request-snapshot"
           onClick={requestSnapshot}
           className="rounded-lg border border-edge px-3 py-1 text-xs text-slate-300 hover:border-accent"
         >
-          Snapshot
-        </button>
+          快照</button>
         <button
           type="button"
           data-testid="load-context"
           onClick={() => void loadContext(state.current_task ?? undefined)}
           className="rounded-lg border border-edge px-3 py-1 text-xs text-slate-300 hover:border-accent"
         >
-          Context
-        </button>
+          上下文</button>
       </div>
 
-      <Field label="Milestone">
+      <Field label="里程碑">
         <span data-testid="current-milestone">{asText(state.current_milestone)}</span>
       </Field>
-      <Field label="Current task">
+      <Field label="当前任务">
         <span data-testid="current-task">{asText(state.current_task)}</span>
       </Field>
 
       {state.goal && (
-        <Field label="Goal">
+        <Field label="目标">
           <p className="text-xs text-slate-300">{state.goal}</p>
         </Field>
       )}
 
-      <Field label={"Todos (" + state.todos.length + ")"}>
+      <Field label={"待办（" + state.todos.length + "）"}>
         {state.todos.length === 0 ? (
-          <span className="text-slate-500">none</span>
+          <span className="text-slate-500">无</span>
         ) : (
           <ul className="flex flex-col gap-1">
             {state.todos.map((todo, index) => (
@@ -127,26 +123,26 @@ export function ProjectStateView() {
         )}
       </Field>
 
-      <Field label={"Files changed (" + state.files_changed.length + ")"}>
+      <Field label={"改动的文件（" + state.files_changed.length + "）"}>
         <CountOrList items={state.files_changed} mono />
       </Field>
-      <Field label="Tests">
+      <Field label="测试">
         <CountOrList items={state.tests} />
       </Field>
-      <Field label="Failures">
+      <Field label="失败">
         <CountOrList items={state.failures} />
       </Field>
-      <Field label="Decisions">
+      <Field label="决策">
         <CountOrList items={state.decisions} />
       </Field>
 
-      <Field label="Environment">
+      <Field label="环境">
         <div className="flex flex-col gap-1">
-          <Row label="git branch">{asText(state.git_branch)}</Row>
-          <Row label="cwd">
+          <Row label="git 分支">{asText(state.git_branch)}</Row>
+          <Row label="工作目录">
             <span className="font-mono">{asText(state.cwd)}</span>
           </Row>
-          <Row label="checkpoint">
+          <Row label="检查点">
             <span className="font-mono">{asText(state.checkpoint)}</span>
           </Row>
         </div>
@@ -161,33 +157,31 @@ export function ProjectStateView() {
               onClick={() => void loadRecovery()}
               className="rounded-md border border-edge px-2 py-0.5 text-[11px] text-slate-400 hover:border-accent"
             >
-              Reload
-            </button>
+              重新加载</button>
           }
         >
-          Recovery
-        </SectionTitle>
+          恢复</SectionTitle>
 
         {recovery.status === "error" && <Empty>{recovery.error}</Empty>}
-        {recovery.data === null && recovery.status !== "error" && <Spinner label="Loading recovery…" />}
+        {recovery.data === null && recovery.status !== "error" && <Spinner label="正在加载恢复信息…" />}
 
         {recovery.data && (
           <div className="flex flex-col gap-1" data-testid="recovery-panel">
-            <Row label="session">{recovery.data.active_session_id ?? "—"}</Row>
-            <Row label="messages">{formatCount(recovery.data.session_message_count)}</Row>
-            <Row label="archived sessions">
+            <Row label="会话">{recovery.data.active_session_id ?? "—"}</Row>
+            <Row label="消息数">{formatCount(recovery.data.session_message_count)}</Row>
+            <Row label="已归档会话">
               {formatCount(recovery.data.archived_session_ids.length)}
             </Row>
-            <Row label="memory entries">{formatCount(recovery.data.memory_count)}</Row>
-            <Row label="taken at">{formatRelative(recovery.data.taken_at)}</Row>
+            <Row label="记忆条目">{formatCount(recovery.data.memory_count)}</Row>
+            <Row label="快照时间">{formatRelative(recovery.data.taken_at)}</Row>
 
             {recovery.data.latest_run && (
               <div className="mt-1 rounded-lg border border-edge bg-surface p-2" data-testid="latest-run">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Latest run</p>
-                <Row label="run_id">{recovery.data.latest_run.run_id}</Row>
-                <Row label="task">{recovery.data.latest_run.task || "—"}</Row>
-                <Row label="step">{formatCount(recovery.data.latest_run.step)}</Row>
-                <Row label="resumable">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">最近一次运行</p>
+                <Row label="运行 ID">{recovery.data.latest_run.run_id}</Row>
+                <Row label="任务">{recovery.data.latest_run.task || "—"}</Row>
+                <Row label="步数">{formatCount(recovery.data.latest_run.step)}</Row>
+                <Row label="可恢复">
                   <StatusPill
                     label={recovery.data.latest_run.resumable ? "yes" : "no"}
                     tone={recovery.data.latest_run.resumable ? "ok" : "warn"}
@@ -201,28 +195,28 @@ export function ProjectStateView() {
 
             {pressure && (
               <div className="mt-1 rounded-lg border border-edge bg-surface p-2" data-testid="context-pressure">
-                <p className="text-[11px] uppercase tracking-wide text-slate-500">Context pressure</p>
-                <Row label="level">
+                <p className="text-[11px] uppercase tracking-wide text-slate-500">上下文压力</p>
+                <Row label="级别">
                   <StatusPill
                     label={pressure.level}
                     tone={pressure.level === "hard" ? "bad" : pressure.level === "soft" ? "warn" : "ok"}
                     testId="pressure-level"
                   />
                 </Row>
-                <Row label="used">
+                <Row label="已用">
                   {pressure.used_chars} / {pressure.budget_chars} chars
                 </Row>
-                <Row label="ratio">{formatRatio(pressure.ratio)}</Row>
+                <Row label="占比">{formatRatio(pressure.ratio)}</Row>
                 {pressure.dropped_sections.length > 0 && (
-                  <Row label="dropped">{pressure.dropped_sections.join(", ")}</Row>
+                  <Row label="已丢弃">{pressure.dropped_sections.join(", ")}</Row>
                 )}
               </div>
             )}
 
             {thresholds && (
               <p className="mt-1 text-[11px] text-slate-500">
-                thresholds: soft {formatRatio(thresholds.soft_ratio)} · hard{" "}
-                {formatRatio(thresholds.hard_ratio)} · keep {thresholds.soft_recent_turns} recent turns
+                阈值：软 {formatRatio(thresholds.soft_ratio)} · 硬{" "}
+                {formatRatio(thresholds.hard_ratio)} · 保留最近 {thresholds.soft_recent_turns} 轮
               </p>
             )}
           </div>
@@ -230,9 +224,9 @@ export function ProjectStateView() {
       </section>
 
       <section className="flex flex-col gap-2 rounded-lg border border-edge bg-panelAlt p-3">
-        <SectionTitle>Built context</SectionTitle>
+        <SectionTitle>构建后的上下文</SectionTitle>
         {context.data === null && context.status !== "error" && (
-          <Empty>Press “Context” to ask the backend for the exact information it would send.</Empty>
+          <Empty>点击“上下文”，向后端请求它实际会发送的完整信息。</Empty>
         )}
         {context.status === "error" && <Empty>{context.error}</Empty>}
         {context.data && (

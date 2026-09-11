@@ -19,7 +19,7 @@ export function BackendOffline({ detail }: { detail?: string | null }) {
       data-testid="backend-offline"
       className="rounded-xl border border-rose-900/70 bg-rose-950/30 p-4 text-sm text-rose-200"
     >
-      <p className="font-semibold">Backend offline</p>
+      <p className="font-semibold">后端离线</p>
       <p className="mt-1 text-xs text-rose-300/90">
         {detail ?? backendError ?? "The console could not reach the backend on the same origin."}
       </p>
@@ -38,8 +38,7 @@ export function BackendOffline({ detail }: { detail?: string | null }) {
         }}
         className="mt-3 rounded-lg border border-rose-800 px-3 py-1 text-xs text-rose-100 hover:bg-rose-900/40"
       >
-        Retry
-      </button>
+        重试</button>
     </div>
   );
 }

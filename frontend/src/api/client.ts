@@ -56,7 +56,7 @@ export function isOfflineError(error: unknown): boolean {
 export function errorMessage(error: unknown): string {
   if (error instanceof ApiError) return error.message;
   if (error instanceof Error) return error.message;
-  return "Unknown error";
+  return "未知错误";
 }
 
 type RequestOptions = {
@@ -92,7 +92,7 @@ async function request<T>(path: string, options: RequestOptions = {}): Promise<T
     throw new ApiError(
       "network",
       path,
-      "Backend offline: " + path + " could not be reached.",
+      "后端离线：" + path + " could not be reached.",
       0,
     );
   }

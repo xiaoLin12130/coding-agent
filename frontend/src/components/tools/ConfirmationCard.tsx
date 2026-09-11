@@ -48,7 +48,7 @@ export function ConfirmationCard({
       )}
     >
       <header className="flex flex-wrap items-center gap-2 border-b border-edge px-3 py-2">
-        <span className="text-xs font-semibold text-amber-200">Confirmation required</span>
+        <span className="text-xs font-semibold text-amber-200">需要确认</span>
         <span data-testid="confirm-tool" className="font-mono text-xs text-slate-100">
           {confirmation.tool}
         </span>
@@ -64,7 +64,7 @@ export function ConfirmationCard({
         {confirmation.command !== "" && (
           <div>
             <div className="flex items-center justify-between">
-              <span className="text-[11px] uppercase tracking-wide text-slate-500">Command</span>
+              <span className="text-[11px] uppercase tracking-wide text-slate-500">命令</span>
               <CopyButton text={confirmation.command} />
             </div>
             <pre
@@ -78,7 +78,7 @@ export function ConfirmationCard({
 
         {confirmation.command === "" && params !== "" && (
           <div>
-            <span className="text-[11px] uppercase tracking-wide text-slate-500">Parameters</span>
+            <span className="text-[11px] uppercase tracking-wide text-slate-500">参数</span>
             <pre
               data-testid="confirm-params"
               className="scroll-thin mt-1 max-h-40 overflow-auto whitespace-pre-wrap break-words rounded-lg bg-[#0b0e13] p-2 font-mono text-[11px] text-slate-200"
@@ -96,7 +96,7 @@ export function ConfirmationCard({
 
         {confirmation.impact.length > 0 && (
           <div>
-            <span className="text-[11px] uppercase tracking-wide text-slate-500">Impact</span>
+            <span className="text-[11px] uppercase tracking-wide text-slate-500">影响</span>
             <ul data-testid="confirm-impact" className="mt-1 list-disc pl-5 text-xs text-slate-300">
               {confirmation.impact.map((item, index) => (
                 <li key={index}>{item}</li>
@@ -107,7 +107,7 @@ export function ConfirmationCard({
 
         {confirmation.reasons.length > 0 && (
           <div>
-            <span className="text-[11px] uppercase tracking-wide text-slate-500">Reasons</span>
+            <span className="text-[11px] uppercase tracking-wide text-slate-500">原因</span>
             <ul data-testid="confirm-reasons" className="mt-1 list-disc pl-5 text-xs text-slate-400">
               {confirmation.reasons.map((item, index) => (
                 <li key={index}>{item}</li>

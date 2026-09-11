@@ -1,5 +1,6 @@
 import { useState } from "react";
 
+import { connectionLabel } from "../../lib/format";
 import { useAppStore } from "../../store/useAppStore";
 import type { RunMode } from "../../types/ui";
 
@@ -60,14 +61,14 @@ export function ChatComposer({
                 (mode === entry ? "bg-panelAlt text-slate-100" : "text-slate-400 hover:text-slate-200")
               }
             >
-              {entry === "run" ? "Agent run" : "Ask model"}
+              {entry === "run" ? "智能体运行" : "询问模型"}
             </button>
           ))}
         </div>
 
         {mode === "run" && (
           <select
-            aria-label="Run mode"
+            aria-label="运行模式"
             data-testid="composer-run-mode"
             value={selected}
             onChange={(event) => setSelected(event.target.value as RunMode)}
@@ -85,19 +86,18 @@ export function ChatComposer({
             onClick={() => void stopRun()}
             className="rounded-lg border border-rose-800 bg-rose-950/40 px-2 py-1 text-[11px] text-rose-200"
           >
-            Stop
-          </button>
+            停止</button>
         )}
 
         <span className="ml-auto text-[11px] text-slate-500">
-          {connection === "connected" ? "socket live" : "socket " + connection}
+          {connection === "connected" ? "连接正常" : "连接" + connectionLabel(connection)}
         </span>
       </div>
 
       <div className="flex items-end gap-2">
         <textarea
           value={draft}
-          aria-label="Message"
+          aria-label="消息"
           placeholder={
             mode === "run"
               ? "Describe the task for the agent (Enter to send, Shift+Enter for a newline)"
@@ -118,7 +118,7 @@ export function ChatComposer({
           disabled={draft.trim() === ""}
           className="rounded-xl bg-accent px-4 py-2 text-sm font-medium text-white disabled:cursor-not-allowed disabled:opacity-40"
         >
-          {mode === "run" ? "Run" : "Send"}
+          {mode === "run" ? "运行" : "发送"}
         </button>
       </div>
     </form>

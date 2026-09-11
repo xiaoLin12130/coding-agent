@@ -33,7 +33,7 @@ export function TerminalPanel() {
         data-testid="terminal-filter"
         value={filter}
         onChange={(event) => setFilter(event.target.value)}
-        placeholder="Filter commands"
+        placeholder="过滤命令"
         aria-label="Filter commands"
         className="w-full rounded-lg border border-edge bg-surface px-3 py-1.5 text-xs placeholder:text-slate-500 focus:border-accent focus:outline-none"
       />
@@ -55,11 +55,11 @@ export function TerminalPanel() {
 
       <section className="flex flex-col gap-2">
         <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-          Tool activity ({rows.length})
+          工具活动（{rows.length})
         </h3>
 
         {rows.length === 0 ? (
-          <Empty>No tool call in this session yet.</Empty>
+          <Empty>本次会话还没有工具调用。</Empty>
         ) : (
           <ul data-testid="terminal-list" className="flex flex-col gap-2">
             {rows.map((tool) => {

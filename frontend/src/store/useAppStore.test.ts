@@ -213,7 +213,8 @@ describe("REST resources", () => {
 
     const state = useAppStore.getState();
     expect(state.backend).toBe("offline");
-    expect(state.backendError).toContain("offline");
+    expect(state.backendError).toContain("离线");
+    expect(state.backendError).toContain("离线");
     expect(state.sessions.data).toBeNull();
     expect(state.sessions.error).toBeTruthy();
     expect(state.settings.data).toBeNull();

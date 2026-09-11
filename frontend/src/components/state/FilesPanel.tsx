@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 
-import { basename } from "../../lib/format";
+import { basename, statusLabel } from "../../lib/format";
 import { selectTimeline, useAppStore } from "../../store/useAppStore";
 import type { EventRecord, ToolCallRecord } from "../../types/ui";
 import { DiffView, parseUnifiedDiff } from "../chat/DiffView";
@@ -56,12 +56,10 @@ export function FilesPanel() {
     return (
       <div className="flex flex-col gap-3" data-testid="files-panel">
         <Empty>
-          No file has been changed in this session yet (project state reports an empty
-          files_changed list).
+          本次会话还没有文件被修改（项目状态里的 files_changed 为空）。
         </Empty>
         <p className="text-[11px] text-slate-600">
-          Diff view: a unified diff is rendered here as soon as a tool result carries one.
-        </p>
+          差异视图：工具结果一旦带上 unified diff，就会显示在这里。</p>
       </div>
     );
   }
@@ -94,17 +92,16 @@ export function FilesPanel() {
       {active && (
         <section className="flex flex-col gap-2">
           <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Touched by
-          </h3>
+            被以下调用修改</h3>
           {owners.length === 0 ? (
-            <Empty>No tool call in the recorded stream touched this file.</Empty>
+            <Empty>记录的事件流里没有工具调用修改过这个文件。</Empty>
           ) : (
             <ul className="flex flex-col gap-1">
               {owners.map((tool) => (
                 <li key={tool.call_id} className="flex items-center gap-2 text-[11px]">
                   <span className="font-mono text-slate-200">{tool.tool}</span>
                   <StatusPill
-                    label={tool.status}
+                    label={statusLabel(tool.status)}
                     tone={tool.status === "ok" ? "ok" : tool.status === "failed" ? "bad" : "info"}
                   />
                   <span className="truncate text-slate-500">{tool.summary}</span>
@@ -113,7 +110,7 @@ export function FilesPanel() {
             </ul>
           )}
 
-          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">Diff</h3>
+          <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">差异</h3>
           {diffText ? (
             <DiffView diff={diffLines} title={basename(active)} />
           ) : (

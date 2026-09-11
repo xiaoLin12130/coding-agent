@@ -1,4 +1,5 @@
 import { useAppStore } from "../store/useAppStore";
+import { backendLabel } from "../lib/format";
 import { StatusPill } from "./common/Ui";
 
 const BACKEND_TONE = {
@@ -21,7 +22,7 @@ export function TopBar() {
   return (
     <header className="flex items-center gap-3 border-b border-edge bg-panel px-4 py-2">
       <h1 className="text-sm font-semibold tracking-wide text-slate-100">
-        Coding Agent <span className="text-slate-500">· Workbench</span>
+        编程助手<span className="text-slate-500">· 工作台</span>
       </h1>
 
       <span
@@ -31,7 +32,7 @@ export function TopBar() {
         className="inline-flex items-center gap-2 text-[11px] text-slate-400"
       >
         <StatusPill
-          label={backend === "offline" ? "backend offline" : "backend " + backend}
+          label={backendLabel(backend)}
           tone={BACKEND_TONE[backend]}
           testId="backend-pill"
         />
@@ -39,12 +40,12 @@ export function TopBar() {
 
       {provider && (
         <span data-testid="topbar-provider" className="text-[11px] text-slate-500">
-          provider <span className="font-mono text-slate-300">{provider.name || "—"}</span>
-          {provider.verified ? " (verified)" : ""}
+          模型提供方 <span className="font-mono text-slate-300">{provider.name || "—"}</span>
+          {provider.verified ? "（已验证）" : ""}
         </span>
       )}
 
-      <span className="text-[11px] text-slate-600">{sessions.length} session(s)</span>
+      <span className="text-[11px] text-slate-600">{sessions.length} 个会话</span>
 
       <div className="ml-auto flex items-center gap-2">
         <button
@@ -56,16 +57,14 @@ export function TopBar() {
           }}
           className="rounded-lg border border-edge px-3 py-1 text-[11px] text-slate-300 hover:border-accent"
         >
-          Snapshot
-        </button>
+          快照</button>
         <button
           type="button"
           data-testid="topbar-reload"
           onClick={() => void loadAll()}
           className="rounded-lg border border-edge px-3 py-1 text-[11px] text-slate-300 hover:border-accent"
         >
-          Reload panels
-        </button>
+          刷新面板</button>
       </div>
     </header>
   );
