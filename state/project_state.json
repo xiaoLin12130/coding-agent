@@ -280,6 +280,12 @@
       "command": "cd frontend && npx tsc --noEmit && npm test",
       "result": "0 type errors; 66 passed in 7 files",
       "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M9), whole suite in one run",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "840 passed in 223s (browser files included)",
+      "date": "2026-09-11"
     }
   ],
   "failures": [
@@ -392,11 +398,12 @@
     "The M9 evaluation found and fixed a real M8 defect (the missing done/error WebSocket names). Before the fix the non-browser backend suite did not finish inside 10 minutes; after it, the same suite runs in 116s.",
     "Evaluation reports are written to runs/evaluation/<stamp>/ (gitignored); the golden sets themselves are committed under backend/evaluation/.",
     "docs/api-protocol.md lists memory_update among the WebSocket events, but the runtime has no memory-change event and none was invented: it is the one documented event a client cannot receive, and tests/test_ws.py records that exception explicitly.",
-    "Evaluation is fully offline: no browser, no network and no real model are involved, so it runs in about 4 seconds and can gate every change."
+    "Evaluation is fully offline: no browser, no network and no real model are involved, so it runs in about 4 seconds and can gate every change.",
+    "M8 + M9 are committed as c36b8c3 (105 files). state/checkpoints/ is now gitignored: 2771 checkpoint files from earlier runs had been picked up by 'git add' and are runtime data, like state/sessions/."
   ],
   "checkpoint": "M9 checkpoint 2026-09-11: provider registry with three adapters (browser, offline scripted, OpenAI-compatible HTTP) selectable from the settings document without touching the AgentLoop; golden parser set of 50 cases over the eight required categories; 15 agent scenarios over the six required dimensions running the real stack with fault injection; thresholds, markdown/JSON report and an evaluation CLI; regression gate in pytest. 840 backend tests (800 non-browser + 40 browser) and 66 frontend tests green. A real M8 defect (the WebSocket never delivered 'done' or 'error') was found and fixed along the way. Project milestone list is now complete: M0..M9.",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",
-  "git_head": "48e53a0913679252cb54c5e1a9fc80eec3c70b77"
+  "git_head": "c36b8c3e90844fd565c7bb9e5d59cccf8b540823"
 }
