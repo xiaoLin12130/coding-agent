@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 
 from app.evaluation.agent_eval import evaluate_agent, run_agent_case
-from app.evaluation.models import AgentCase, AgentExpectation
+from app.evaluation.models import AgentCase
 
 
 def base_case(**kwargs) -> AgentCase:

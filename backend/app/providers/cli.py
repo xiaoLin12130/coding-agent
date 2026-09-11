@@ -106,8 +106,6 @@ def _cmd_check(args: argparse.Namespace) -> int:
     code = 0
     if args.prompt:
         try:
-            from ..agents.llm import ModelClientError
-
             reply = model.complete(args.prompt)
             report["answered"] = reply.text[:400]
         except Exception as exc:  # noqa: BLE001 - reported, not raised

@@ -12,12 +12,10 @@ regression, which is what a CI job (or the regression test) reacts to.
 from __future__ import annotations
 
 import argparse
-import json
-import sys
 from pathlib import Path
 
 from .models import EvaluationThresholds
-from .report import render_json, render_markdown, report_paths, write_report
+from .report import render_json, render_markdown, write_report
 from .runner import run_evaluation
 
 
