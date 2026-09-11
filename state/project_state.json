@@ -1,35 +1,35 @@
 {
-  "current_milestone": "M1",
+  "current_milestone": "M2",
   "current_task": null,
-  "goal": "M1 — Browser Driver: minimal Playwright capability to drive a web LLM page (headed browser, persistent profile, open/input/send/completion detection/reply capture/screenshot/DOM snapshot) behind a ProviderAdapter, with exactly one provider implementation.",
-  "milestone_status": "M1 complete, M2 not started",
+  "goal": "M2 — State and Context: TranscriptStore, ProjectState, MemoryStore, ContextBuilder and SessionManager with JSON persistence, so state is saved, the program can be closed and restarted, and the context for the next turn is built correctly.",
+  "milestone_status": "M2 complete, M3 not started",
   "todos": [
     {
-      "content": "BrowserDriver: headed Playwright persistent context, navigation, screenshot, DOM snapshot, network capture",
+      "content": "M2: typed Memory/MemoryEntry model + sessions dir config",
       "status": "completed"
     },
     {
-      "content": "ProviderAdapter contract (open/send/wait_until_complete/capture_response/is_logged_in/recover_session)",
+      "content": "M2: TranscriptStore (JSONL per session, torn-line tolerant, turn grouping, extractive summary)",
       "status": "completed"
     },
     {
-      "content": "Single provider: selector-driven WebChatProvider + JSON provider profiles",
+      "content": "M2: MemoryStore with the memory_propose review pipeline (filter/dedupe/conflict/sensitive/write)",
       "status": "completed"
     },
     {
-      "content": "Artifact store: per-run screenshot/DOM/timeline/reply/network files under runs/",
+      "content": "M2: ContextBuilder (priority order, char budget, truncation with reference, untrusted marker, summary section)",
       "status": "completed"
     },
     {
-      "content": "Offline fixture chat page (SSE streaming, stop control, login wall) for deterministic verification",
+      "content": "M2: SessionManager (create/resume/rotate, bounded seed, summary + archive, corrupt-index rebuild)",
       "status": "completed"
     },
     {
-      "content": "Tests: driver, provider (acceptance/timeout/login/capture priority), profiles, CLI",
+      "content": "M2: tests for transcript/memory/context/session + restart-recovery acceptance",
       "status": "completed"
     },
     {
-      "content": "Manual CLI acceptance run: open -> send -> wait -> capture -> screenshot -> DOM",
+      "content": "M2: surface the layer (read-only REST /api/sessions,/api/messages,/api/context + app.context.cli) and document it",
       "status": "completed"
     }
   ],
@@ -59,15 +59,31 @@
     "backend/README.md",
     ".gitignore",
     "state/project_state.json",
-    "state/memory.json"
+    "state/memory.json",
+    "backend/tests/test_storage.py",
+    "backend/app/context/__init__.py",
+    "backend/app/context/models.py",
+    "backend/app/context/transcript.py",
+    "backend/app/context/memory.py",
+    "backend/app/context/builder.py",
+    "backend/app/context/session.py",
+    "backend/app/context/cli.py",
+    "backend/app/api/context.py",
+    "backend/app/deps.py",
+    "backend/app/main.py",
+    "backend/app/config.py",
+    "backend/app/models.py",
+    "backend/tests/conftest.py",
+    "backend/tests/test_transcript_store.py",
+    "backend/tests/test_memory_store.py",
+    "backend/tests/test_context_builder.py",
+    "backend/tests/test_session_manager.py",
+    "backend/tests/test_context_api.py",
+    "backend/tests/test_context_cli.py",
+    "backend/tests/test_storage.py",
+    "backend/README.md"
   ],
   "tests": [
-    {
-      "name": "backend pytest (M0 + M1)",
-      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
-      "result": "57 passed in 63.6s (test_api 6, test_ws 7, test_storage 7, test_profiles 12, test_browser_driver 8, test_web_chat_provider 12, test_cli 5); browser tests launch a real headed Chromium",
-      "date": "2026-09-11"
-    },
     {
       "name": "M1 acceptance run (manual CLI, outside pytest)",
       "command": "python -m fixtures.chat_site.server --port 8765; python -m app.browser.cli ask --profile mock --prompt 'M1 acceptance run'",
@@ -85,6 +101,18 @@
       "command": "git ls-remote origin",
       "result": "refs/heads/main = 48e53a0913679252cb54c5e1a9fc80eec3c70b77, identical to local HEAD; repo URL returns HTTP 200",
       "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0 + M1 + M2)",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "150 passed in 66.8s (M2 added 93: test_transcript_store 16, test_memory_store 22, test_context_builder 15, test_session_manager 21, test_context_api 10, test_context_cli 9)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M2 acceptance run (three real processes, outside pytest)",
+      "command": "process 1: work + save state; process 2: `python -m app.context.cli resume`; process 3: rotate and rebuild context",
+      "result": "PASS: process 2 recovered the session created by process 1 (recovered=True, 3 messages / 1 turn), project state M2 + todo + 1 memory entry restored, context assembled as system/task/project_state/memory/transcript; rotation archived the session, kept a seed carrying project state + task + memory, and carried 3 entries verbatim",
+      "date": "2026-09-11"
     }
   ],
   "failures": [],
@@ -98,16 +126,29 @@
     "Artifacts are written per run to runs/<timestamp>-<profile>/ (screenshot, DOM html+text, timeline, reply, network log); runs/ and .browser-profile/ are gitignored.",
     "playwright is pinned to 1.62.0 in the repo venv so it reuses the Chromium build already installed at C:\\Users\\LIN\\AppData\\Local\\ms-playwright (chromium-1234).",
     "M1 delivered no frontend or API changes: the browser layer is not yet reachable from the web console (no Tool/AgentLoop may call it until later milestones).",
-    "Subagent delegation was broken in this environment: children inherit the parent agent's create-time route (agent.options), not its live model route, so after a mid-session default-model switch every delegation hit the stale opencode-go provider and failed with 400 MissingSessionID (missing x-opencode-session). Root cause proven from the child session logs and fixed by pinning config.agentOptions (provider commandcode / model deepseek/deepseek-v4.1-flash) on the tool-subagent and tool-subagent-fork rows of the liangshen agent preset; the pin needs a DSH restart or a new session to mount, and the workflow tool passing an explicit provider/model works as an immediate workaround (verified)."
+    "Subagent delegation was broken in this environment: children inherit the parent agent's create-time route (agent.options), not its live model route, so after a mid-session default-model switch every delegation hit the stale opencode-go provider and failed with 400 MissingSessionID (missing x-opencode-session). Root cause proven from the child session logs and fixed by pinning config.agentOptions (provider commandcode / model deepseek/deepseek-v4.1-flash) on the tool-subagent and tool-subagent-fork rows of the liangshen agent preset; the pin needs a DSH restart or a new session to mount, and the workflow tool passing an explicit provider/model works as an immediate workaround (verified).",
+    "M2 memory entries are typed (MemoryEntry: key/value/namespace/source/sensitive/source_turn/updated_by/timestamps) instead of an opaque list; this supersedes the M0 assertion that memory.json round-trips verbatim, so tests/test_storage.py::test_memory_round_trip now asserts the typed round trip plus defaults.",
+    "M2 transcripts are stored as append-only JSONL per session under state/sessions/ (gitignored): a crash can only tear the last line, and the reader skips unparsable lines instead of losing the whole transcript.",
+    "M2 external content is untrusted: the ContextBuilder renders tool results/DOM text with an explicit untrusted marker, and MemoryStore rejects secrets before they can be persisted.",
+    "Command Code provider: patched the installed 0.9.1 in place (reasoning replay on the CLI transport + selectable reasoning efforts for deepseek/deepseek-v4.1-flash) because the upstream fix ships in 0.10.5, which requires dsh >= 0.1.2-rc.1 and this machine runs dsh 0.1.1-rc.1. Patch and backup are stored next to the plugin and in ~/.dsh/patches/; it must be re-applied after any plugin update.",
+    "M2 context budget is measured in characters, not tokens: there is no tokenizer behind the provider boundary yet. ContextBuilder truncates non-protected sections (head+tail, omitting-size recorded, reference kept) and drops the lowest priority ones; system and task are never dropped.",
+    "M2 rotation seeds the new session with a BOUNDED summary (seed_summary_chars, default 1500). Embedding the full summary rebuilt a context as large as the one rotation existed to escape (observed: 8225 -> 8245 chars in a test before the fix).",
+    "Rotation only reclaims space when the session is near the budget; the seed is a fixed cost, so rotating a small session can grow the context. should_rotate() is the documented gate and the rotate CLI prints the before/after sizes plus a note instead of hiding it.",
+    "M2 REST surface is read-only (/api/sessions, /api/sessions/{id}, /api/messages, /api/context) and no endpoint executes anything; the Tool layer arrives in M3 behind SafetyLayer/Executor. Named after docs/api-protocol.md, keeping /api/project_state and /api/memory.",
+    "M2 memory dedupe compares VALUES only: the same key with a different value is a conflict, not a duplicate (the first implementation classified it as duplicate, which silently swallowed the conflict).",
+    "M2 skips the project_state context section entirely when the state holds nothing factual, so an unstarted project does not push placeholder lines into every turn (docs/state-context.md forbids injecting everything by default)."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
     "Image inspection is unavailable to this model, so the screenshot was validated structurally (PNG magic bytes, 1440x900 IHDR, IDAT present) rather than visually.",
     "Subagent route fix (2026-09-11): ~/.dsh/.agent-presets/liangshen/agent.cordis.yml edited (backup kept next to it) to pin the child agent route; takes effect on the next session/DSH restart, so delegation from the already-running session still uses the stale route.",
     "Git: repository initialised by the user (branch main, remote origin https://github.com/xiaoLin12130/coding-agent.git). The M0+M1 work is committed as 48e53a0913679252cb54c5e1a9fc80eec3c70b77 and pushed to origin/main on 2026-09-11 (90 files). The AGENTS.md reviewer step was not performed before this initial commit.",
-    "A stray empty clone of the same repository sits at ./coding-agent/ (only a .git directory, no commits, no files, no stashes). It is untracked and makes 'git add -A' fail with \"'coding-agent/' does not have a commit checked out\"; it was deliberately excluded from the commit instead of being deleted."
+    "A stray empty clone of the same repository sits at ./coding-agent/ (only a .git directory, no commits, no files, no stashes). It is untracked and makes 'git add -A' fail with \"'coding-agent/' does not have a commit checked out\"; it was deliberately excluded from the commit instead of being deleted.",
+    "The Command Code provider patch takes effect only after a DSH restart; until then the running session keeps the unpatched adapter module.",
+    "M2 is complete: backend/app/context/{models,transcript,memory,builder,session,cli}.py plus the read-only /api context routes; 150 backend tests green.",
+    "state/sessions/ holds runtime transcripts and the session index and is gitignored; the state files themselves (project_state.json, memory.json) stay tracked."
   ],
-  "checkpoint": "M1 checkpoint 2026-09-11: browser layer complete (BrowserDriver + ProviderAdapter + WebChatProvider + profiles + artifacts + CLI), 57 backend tests green, full acceptance path verified end-to-end outside pytest against the offline fixture (open -> send -> wait -> capture -> screenshot -> DOM). Next milestone: M2 (State and Context).",
+  "checkpoint": "M2 checkpoint 2026-09-11: Context/State layer complete (TranscriptStore JSONL, MemoryStore review pipeline, ContextBuilder with budget/truncation, SessionManager with bounded-seed rotation), restart recovery verified across three real processes, 150 backend tests green. Next milestone: M3 (Tool System).",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",

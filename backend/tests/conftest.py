@@ -57,6 +57,36 @@ def client(state_files: Path) -> TestClient:
 
 
 # ---------------------------------------------------------------------------
+# Context / State fixtures (M2)
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture()
+def app_paths(state_files: Path):
+    """AppPaths pointing at the per-test state directory."""
+    from app.config import AppPaths
+
+    return AppPaths(
+        project_root=state_files,
+        state_dir=state_files,
+        project_state_file=state_files / "project_state.json",
+        memory_file=state_files / "memory.json",
+    )
+
+
+@pytest.fixture()
+def state_store(app_paths):
+    from app.storage import StateStore
+
+    return StateStore(app_paths)
+
+
+@pytest.fixture()
+def sessions_root(tmp_path: Path) -> Path:
+    return tmp_path / "sessions"
+
+
+# ---------------------------------------------------------------------------
 # Browser layer fixtures (M1)
 # ---------------------------------------------------------------------------
 

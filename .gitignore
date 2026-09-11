@@ -9,6 +9,9 @@ node_modules/
 dist/
 coverage/
 
+# Session transcripts (runtime data, M2)
+state/sessions/
+
 # Browser layer artifacts (M1)
 runs/
 .browser-profile/

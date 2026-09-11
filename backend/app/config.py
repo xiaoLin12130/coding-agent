@@ -22,6 +22,7 @@ ENV_STATE_DIR = "CODING_AGENT_STATE_DIR"
 ENV_RUNS_DIR = "CODING_AGENT_RUNS_DIR"
 ENV_PROFILES_DIR = "CODING_AGENT_PROFILES_DIR"
 ENV_BROWSER_PROFILE_DIR = "CODING_AGENT_BROWSER_PROFILE_DIR"
+ENV_SESSIONS_DIR = "CODING_AGENT_SESSIONS_DIR"
 
 
 def project_root() -> Path:
@@ -39,6 +40,13 @@ def state_dir() -> Path:
         return Path(override).resolve()
     return project_root() / "state"
 
+
+def sessions_dir() -> Path:
+    """Directory holding session transcripts and the session index."""
+    override = os.environ.get(ENV_SESSIONS_DIR)
+    if override:
+        return Path(override).resolve()
+    return state_dir() / "sessions"
 
 def runs_dir() -> Path:
     """Directory holding browser artifacts (screenshots, DOM snapshots)."""

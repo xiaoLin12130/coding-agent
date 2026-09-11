@@ -54,12 +54,32 @@ class ProjectState(BaseModel):
     cwd: str | None = None
 
 
-class Memory(BaseModel):
-    """Long-lived, reusable knowledge. Plain container for M0."""
+class MemoryEntry(BaseModel):
+    """One long-lived memory item.
+
+    Timestamps stay strings so an existing memory.json keeps its exact
+    formatting when it is loaded and written back (M2 decision).
+    """
 
     model_config = ConfigDict(extra="allow")
 
-    memories: list[Any] = Field(default_factory=list)
+    key: str
+    value: str
+    namespace: str = "user"
+    source: str = ""
+    sensitive: bool = False
+    source_turn: str | None = None
+    updated_by: str | None = None
+    created_at: str | None = None
+    updated_at: str | None = None
+
+
+class Memory(BaseModel):
+    """Long-lived, reusable knowledge."""
+
+    model_config = ConfigDict(extra="allow")
+
+    memories: list[MemoryEntry] = Field(default_factory=list)
 
 
 # --------------------------------------------------------------------------

@@ -49,11 +49,19 @@ def test_project_state_round_trip(tmp_path: Path) -> None:
 
 
 def test_memory_round_trip(tmp_path: Path) -> None:
+    # M2 made memory entries typed (MemoryEntry), so a written entry now
+    # carries the entry defaults instead of the verbatim input object.
     store = StateStore(_paths(tmp_path))
     store.save_memory(Memory(memories=[{"key": "k", "value": "v"}]))
     raw = json.loads((tmp_path / "memory.json").read_text(encoding="utf-8"))
-    assert raw == {"memories": [{"key": "k", "value": "v"}]}
-    assert store.load_memory().memories[0]["key"] == "k"
+    assert raw["memories"][0]["key"] == "k"
+    assert raw["memories"][0]["value"] == "v"
+
+    loaded = store.load_memory().memories[0]
+    assert loaded.key == "k"
+    assert loaded.value == "v"
+    assert loaded.namespace == "user"
+    assert loaded.sensitive is False
 
 
 def test_write_leaves_no_temp_files_behind(tmp_path: Path) -> None:
