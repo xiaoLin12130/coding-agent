@@ -8,7 +8,8 @@ type ComposerMode = "run" | "chat";
 /**
  * One input for both ways of talking to the backend:
  *   run  -> {"type":"run","task":...,"mode":"single|multi"}
- *   chat -> {"type":"chat","content":"..."}  (M0 echo compatibility)
+ *   chat -> {"type":"ask","content":"..."}   (the configured model answers,
+ *                                              streamed back as assistant_delta)
  */
 export function ChatComposer({
   draft,
@@ -59,7 +60,7 @@ export function ChatComposer({
                 (mode === entry ? "bg-panelAlt text-slate-100" : "text-slate-400 hover:text-slate-200")
               }
             >
-              {entry === "run" ? "Agent run" : "Chat echo"}
+              {entry === "run" ? "Agent run" : "Ask model"}
             </button>
           ))}
         </div>
@@ -100,7 +101,7 @@ export function ChatComposer({
           placeholder={
             mode === "run"
               ? "Describe the task for the agent (Enter to send, Shift+Enter for a newline)"
-              : "Send a chat message (M0 echo, Enter to send)"
+              : "Ask the configured model a question (the answer streams in)"
           }
           rows={2}
           onChange={(event) => setDraft(event.target.value)}

@@ -323,7 +323,10 @@ export const useAppStore = create<AppStore>((set, get) => {
     sendChat(content) {
       const text = content.trim();
       if (text === "") return false;
-      const sent = getChatClient().send({ type: "chat", content: text });
+      // "ask" goes to the configured provider (the real web LLM) and the answer
+      // comes back as assistant_delta frames; the M0 echo frame stays available
+      // for the compatibility test and is not what a user wants here.
+      const sent = getChatClient().send({ type: "ask", content: text });
       if (!sent) return false;
       set((state) => ({
         live: {

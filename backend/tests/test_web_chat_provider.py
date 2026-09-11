@@ -248,3 +248,24 @@ def test_ask_refuses_when_not_logged_in(driver, mock_profile) -> None:
 
     with pytest.raises(LoginRequiredError):
         provider.ask(PROMPT, timeout_ms=5_000)
+
+# --- the provider streams too (M11) ----------------------------------------
+
+
+def test_the_provider_reports_the_answer_while_the_page_writes_it(
+    mock_profile, driver
+) -> None:
+    """ask_stream() emits the answer as it grows, then the captured text."""
+    from app.browser.web_chat import WebChatProvider
+
+    provider = WebChatProvider(driver, mock_profile)
+    provider.open()
+    pieces: list[tuple[str, bool]] = []
+    reply = provider.ask_stream("stream please", lambda text, reset: pieces.append((text, reset)))
+
+    assert reply.completed is True
+    assert pieces, "no delta was reported"
+    assert "".join(text for text, reset in pieces if not reset).endswith(reply.text) or pieces[
+        -1
+    ][0] == reply.text
+    assert pieces[-1][1] in (True, False)

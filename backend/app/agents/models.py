@@ -48,6 +48,10 @@ EventType = Literal[
     "error",
     "done",
     "run_end",
+    # Streaming text of an answer, emitted while the model is still writing it
+    # (M11: a question asked in the console is answered by the real web LLM and
+    # the console shows the words as they arrive).
+    "assistant_delta",
 ]
 
 
@@ -104,6 +108,10 @@ class LoopLimits(BaseModel):
     repeat_threshold: int = Field(default=3, ge=2)
     # Stop early when the model repeats the same reply without a tool call.
     max_identical_replies: int = Field(default=2, ge=2)
+    # Before a repeated call ENDS the run, say so in the next prompt this many
+    # times. Repeating a call that already returned this result cannot change
+    # anything, and a web model sometimes needs to be told that.
+    max_loop_nudges: int = Field(default=1, ge=0, le=3)
 
 
 class AgentEvent(BaseModel):

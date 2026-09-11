@@ -127,6 +127,7 @@ class AgentLoop:
         tool_failures = checkpoint.tool_failures if checkpoint else 0
         tool_results: list[str] = []
         signature_history: list[str] = []
+        loop_nudges = 0
         denied_reasons: list[str] = []
         status: str = "error"
         reason = ""
@@ -298,12 +299,40 @@ class AgentLoop:
             cycle = self._detect_cycle(signature_history)
             if cycle is not None:
                 period, repeats = cycle
-                status = "loop"
                 reason = (
                     "the same "
                     + ("tool call" if period == 1 else str(period) + "-step tool pattern")
                     + " repeated " + str(repeats) + " times"
                 )
+                if loop_nudges < self.limits.max_loop_nudges:
+                    # Repeating a call that already produced this exact result
+                    # cannot change anything: before giving up, say so in the
+                    # next prompt. A web model that stopped reacting to the tool
+                    # output (observed live: the same run_shell three times while
+                    # the traceback sat in the context) gets one bounded chance,
+                    # and the run still ends if it repeats again.
+                    loop_nudges += 1
+                    events.append(
+                        self._event(
+                            "loop_detected",
+                            step_index,
+                            reason + "; told the model to change the call",
+                            ok=False,
+                            data={"nudge": True, "attempt": loop_nudges},
+                        )
+                    )
+                    tool_results = [
+                        "LOOP WARNING: "
+                        + reason
+                        + ". Repeating that call cannot change its result. Read the "
+                        "output above, then either change the arguments, fix the file "
+                        "it complains about, or finish with a final answer."
+                    ]
+                    record.duration_ms = int((time.monotonic() - step_started) * 1000)
+                    record.note = "loop nudge " + str(loop_nudges) + "/" + str(self.limits.max_loop_nudges)
+                    steps.append(record)
+                    continue
+                status = "loop"
                 events.append(self._event("loop_detected", step_index, reason, ok=False))
                 record.duration_ms = int((time.monotonic() - step_started) * 1000)
                 steps.append(record)

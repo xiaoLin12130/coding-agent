@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import abc
 from datetime import datetime, timezone
+from typing import Callable
 
 from .artifacts import ArtifactStore
 from .driver import BrowserDriver
@@ -68,6 +69,24 @@ class ProviderAdapter(abc.ABC):
 
     # -- shared composition ------------------------------------------------
 
+    def ask_stream(
+        self,
+        prompt: str,
+        on_delta: Callable[[str, bool], None],
+        timeout_ms: int | None = None,
+        new_conversation: bool = False,
+    ) -> ProviderReply:
+        """Ask, reporting the answer as it is written.
+
+        'on_delta(text, reset)' is called with each new piece; reset=True means
+        'replace what you have with this text' (a provider that cannot stream
+        sends the whole reply once). The default here is exactly that: providers
+        override it when their page can be read while it generates.
+        """
+        reply = self.ask(prompt, timeout_ms=timeout_ms, new_conversation=new_conversation)
+        on_delta(reply.text, True)
+        return reply
+
     def after_reply(self) -> None:
         """Hook: called once a reply has been captured.
 
@@ -80,6 +99,7 @@ class ProviderAdapter(abc.ABC):
         prompt: str,
         timeout_ms: int | None = None,
         new_conversation: bool = False,
+        on_delta: Callable[[str, bool], None] | None = None,
     ) -> ProviderReply:
         """Full acceptance path: send -> wait -> capture -> save artifacts.
 
@@ -94,8 +114,12 @@ class ProviderAdapter(abc.ABC):
                 "and sign in manually in the headed browser window"
             )
         self.send(prompt)
-        timeline = self.wait_until_complete(timeout_ms)
+        timeline = self.wait_until_complete(timeout_ms, on_delta=on_delta)
         captured = self.capture_response()
+        if on_delta is not None and captured.text:
+            # the captured reply is authoritative: send it as a reset so the
+            # client ends with exactly what was captured
+            on_delta(captured.text, True)
         self.after_reply()
         artifacts = self.save_artifacts(
             label=self.profile.name, timeline=timeline, captured=captured

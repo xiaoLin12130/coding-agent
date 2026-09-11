@@ -1,35 +1,43 @@
 {
-  "current_milestone": "M10",
+  "current_milestone": "M12",
   "current_task": null,
-  "goal": "M10 — Human-like interaction and session reuse: drive a real web LLM the way a person does (pointer, clicks, mixed-speed typing, pauses), keep ONE conversation for a whole run instead of one per question, and switch the site's thinking mode on by default.",
-  "milestone_status": "M10 complete (M0..M10 all complete)",
+  "goal": "M12 — Real-environment hardening: run the agent against a real web LLM from the console on a real project, record every defect that surfaced, and fix them.",
+  "milestone_status": "M0..M12 complete (M12 = real-environment hardening)",
   "todos": [
     {
-      "content": "M10: HumanActor (segmented pointer move, click, clear draft, per-character typing, pauses)",
+      "content": "M11: ask the model from the console and stream the answer back (REST + WS + UI)",
       "status": "completed"
     },
     {
-      "content": "M10: HumanPolicy with a FAST band and a SLOW band, randomised, injectable RNG",
+      "content": "M11/M12: fix the streaming latency (a question took the full 180 s timeout)",
       "status": "completed"
     },
     {
-      "content": "M10: conversation reuse in WebChatProvider.open (navigate only when new_conversation=True)",
+      "content": "M12: one browser thread owns the Playwright session (second run used to crash)",
       "status": "completed"
     },
     {
-      "content": "M10: PreSendToggle + apply_toggles, thinking mode on by default in the DeepSeek profile",
+      "content": "M12: capture the reply exactly (code-block indentation, page chrome)",
       "status": "completed"
     },
     {
-      "content": "M10: offline tests for rhythm, pointer, toggles and reuse (43 new)",
+      "content": "M12: clipboard paste race + long-prompt fallback",
       "status": "completed"
     },
     {
-      "content": "M10: real-environment verification against chat.deepseek.com (two questions, one conversation)",
+      "content": "M12: run_shell timeout must kill the process tree (a spawned server froze a run)",
       "status": "completed"
     },
     {
-      "content": "M10: docs (milestones/M10.md, docs/browser.md, docs/testing.md, backend/README.md)",
+      "content": "M12: bounded LOOP WARNING before a repeated call ends the run",
+      "status": "completed"
+    },
+    {
+      "content": "M12: transcript clipping so the context stops rotating every step",
+      "status": "completed"
+    },
+    {
+      "content": "M12: live test - build a library management system through the console UI",
       "status": "completed"
     }
   ],
@@ -184,7 +192,19 @@
     "backend/tests/manual/live_deepseek_check.py",
     "backend/tests/manual/live_browser_agent_check.py",
     "milestones/M10.md",
-    "docs/browser.md"
+    "docs/browser.md",
+    "backend/tests/test_console_ask.py",
+    "backend/tests/test_console_model.py",
+    "backend/tests/test_agent_loop_nudge.py",
+    "backend/tests/test_tools_shell_timeout.py",
+    "backend/tests/manual/ui_drive_run.py",
+    "backend/tests/manual/live_project_build.py",
+    "milestones/M11.md",
+    "milestones/M12.md",
+    "frontend/src/lib/ws.ts",
+    "frontend/src/lib/events.ts",
+    "frontend/src/store/useAppStore.ts",
+    "frontend/src/components/chat/ChatComposer.tsx"
   ],
   "tests": [
     {
@@ -328,7 +348,11 @@
   ],
   "failures": [
     "M8 defect found while making the M9 regression gate run: app/api/ws.py EVENT_NAMES had no entry for the runtime's 'done' and 'error' events, so every run end and every failure reached WebSocket clients as 'agent_update' and the documented names were unreachable. The test that covered it (test_console_api.py::test_ws_run_streams_documented_events) waited forever for a frame that could not arrive, which is why the backend suite hung for minutes instead of failing. Mapping added and guarded by tests in tests/test_ws.py.",
-    "Known parser limitations recorded as known_gap in backend/evaluation/parser_golden.jsonl (not fixed in M9, which is an evaluation milestone): a truncated second call after a complete one is dropped without any issue; a call quoted as an example in prose is executed like a real one; identical calls are returned twice."
+    "Known parser limitations recorded as known_gap in backend/evaluation/parser_golden.jsonl (not fixed in M9, which is an evaluation milestone): a truncated second call after a complete one is dropped without any issue; a call quoted as an example in prose is executed like a real one; identical calls are returned twice.",
+    "M12 real-environment run (library management system built from the console UI): the generated project was NOT finished. db.py ends up importable, but tests/test_api.py blocks because app.py calls main() at import time, and the agent never fixed it. Every attempt is preserved in H:/AI-game/library-live with its task text and console log.",
+    "M12: code captured from the page lost its indentation. innerText folds the leading whitespace of a rendered code block, so a Python file written by the agent arrived with ONE space per level and no generated file could be imported. The model itself reported it ('The write_file tool seems to collapse my indentation'). Fixed by reading code blocks with textContent (profile code_block_selector); the page HTML proves the model's text had 4 spaces.",
+    "M12: subprocess.run(timeout=...) does not stop a shell command on Windows. The timeout killed only the shell; a grandchild (the HTTP server a generated test starts) kept the stdout pipe open, so communicate() waited forever and the whole agent run froze for minutes behind one tool call. Fixed with Popen + process-tree kill (taskkill /T).",
+    "M12: two processes sharing one browser profile directory cannot coexist - Chromium attaches to the running instance and Playwright then reports 'Target page, context or browser has been closed'. Now reported as a clear BrowserError naming the profile that is in use."
   ],
   "decisions": [
     "M1 drives the browser through a selector-driven WebChatProvider fed by JSON provider profiles; site detail never lives in provider or (future) agent code.",
@@ -411,7 +435,18 @@
     "open() reuses the conversation by default and only navigates on an explicit new_conversation=True; the conversation URL is remembered after every reply, so a page that drifted away returns to the SAME chat rather than to the site root. A person asking a second question types into the thread they are already in.",
     "A profile declares the site switches that must be ON (PreSendToggle). The ON marker is checked, the control is clicked when the marker is missing, and a click that never produces the marker RAISES instead of being reported as success - a silently failed switch would otherwise show up as a worse answer, not as an error.",
     "DeepSeek thinking mode (深度思考) is on by default in the shipped profile, because the agent wants the model's reasoning rather than a quick guess; the page keeps whatever the last human session left behind, so 'the toggle exists' is not 'the mode is on'.",
-    "Manual live checks are kept out of pytest (they bind ports, open a headed browser and talk to a real site); they exist so 'it works offline' can be separated from 'it works against a real web LLM'."
+    "Manual live checks are kept out of pytest (they bind ports, open a headed browser and talk to a real site); they exist so 'it works offline' can be separated from 'it works against a real web LLM'.",
+    "The console's chat is a question to the configured provider, not an agent run: 'ask' goes through the WebSocket/REST, the answer streams back as assistant_delta frames, and no tool, task or executor is involved. The M0 echo frame stays on the wire for compatibility and is no longer what the UI sends.",
+    "Streaming is not a second implementation of completion detection: BrowserModel.complete_stream -> WebChatProvider.ask_stream -> wait_until_complete(on_delta=...). The first version wrote its own fixed-budget loop and every question took the full completion timeout (180 s) before anything appeared.",
+    "One dedicated thread owns the Playwright session for the life of the console process, and every browser call is marshalled onto it. Playwright's sync objects belong to their creating thread and the runtime starts a new worker thread per run, which made the SECOND run fail with 'cannot switch to a different thread'. A side effect is that the page stays open between runs, so the console keeps working in the same conversation.",
+    "A question that fails is offered ONE recovery attempt (M6 recover_session) on the browser thread; if recovery refuses, the original error is raised rather than retrying forever.",
+    "Reply capture reads code blocks with textContent and the rest of the answer with innerText, and hides the profile's ignore_selectors for the duration of the read. Rendered text is not the model's text: it can fold indentation and it contains the page's own buttons.",
+    "A long prompt is pasted, not typed, and the clipboard write is awaited and verified; if the paste cannot be made to work the composer is filled instead of typing thousands of characters one by one. Human-like pacing must not cost minutes per step.",
+    "Shell commands are run with Popen and killed by process tree on timeout, because a surviving grandchild holds the pipes open and the caller would never see an answer.",
+    "Before a repeated tool call ENDS a run, the loop injects one bounded LOOP WARNING into the next prompt (repeat_threshold still applies). Repeating a call that already returned this exact result cannot change anything, and the live model needed to be told.",
+    "The console's default step budget is 40, not the loop's 25: a real project task (read, write several files, run a test, fix it, run again) does not fit in 25, and a live run hit the limit exactly while fixing its own broken test.",
+    "The transcript section clips each message to 1200 characters. An assistant message carries its whole tool call, so a few 5 KB file writes filled the 28 000-character budget by themselves and every step rotated the session, losing the tool result the model was supposed to react to.",
+    "The M12 findings are recorded, not hidden: the web model is unreliable at large structured edits (two consecutive invalid-JSON replies ended runs) and the project it was asked to build is unfinished. The execution chain (parser -> safety -> executor -> loop -> console) held up; the limitations are the model and the site."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -452,9 +487,9 @@
     "The off switch for human pacing is profile-level (human.enabled=false) and is used by pages where instant input is correct; the shipped mock profile keeps it ON with a 1-4 ms rhythm so the suite still exercises the human path.",
     "runs/ now holds live-check artifacts from real DeepSeek sessions (screenshots, DOM dumps, timelines); they are gitignored like every other run artifact."
   ],
-  "checkpoint": "M10 checkpoint 2026-09-11: the browser layer drives a real web LLM the way a person does - segmented pointer movement, a click, draft clearing, per-character typing with a fast/slow rhythm, pauses before send and after the reply - and keeps ONE conversation for a whole run instead of one per question, with the site's thinking mode switched on by default and its ON marker verified. 883 backend tests and 66 frontend tests green; evaluation still PASS. Verified live against chat.deepseek.com both at the provider level (two questions, same chat) and through the whole stack (settings -> browser provider -> AgentLoop -> read_file -> answer). Previous milestone in this commit: 2701b53.",
+  "checkpoint": "M12 checkpoint 2026-09-11: the console drives a real web LLM end to end - ask a question and watch the answer stream in (M11), then run a real project task from the UI (M12). Twelve defects found by doing that were fixed with tests, including the two that mattered most: code captured from the page lost its indentation (every generated file failed to import) and the shell timeout did not actually return on Windows (a generated test that starts a server froze a whole run). 900+ backend tests and 66 frontend tests green; the evaluation suites still pass. The test project itself (H:/AI-game/library-live) is NOT finished: app.py starts the server at import time and the model never fixed it - recorded as a failure, with the model's own output quality as the limiting factor.",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",
-  "git_head": "c36b8c3e90844fd565c7bb9e5d59cccf8b540823"
+  "git_head": "1935ef1811907134a5868400b31ef1a3f5ac50f8"
 }

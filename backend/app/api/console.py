@@ -183,6 +183,23 @@ def start_run(
     return {"run_id": record.run_id, "accepted": True}
 
 
+@router.post("/agent/ask")
+def ask_model(payload: dict, runtime: AgentRuntime = Depends(get_agent_runtime)) -> dict[str, Any]:
+    """Ask the model one question; the answer streams over the WebSocket.
+
+    Not an agent run: no task, no tools, no executor. It is the console's chat
+    path to the configured provider (M11).
+    """
+    text = str(payload.get("content") or payload.get("text") or "")
+    try:
+        record = runtime.ask(text)
+    except RuntimeError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+    return {"run_id": record.run_id, "accepted": True, "mode": "ask"}
+
+
 @router.post("/agent/stop")
 def stop_run(
     payload: dict | None = None, runtime: AgentRuntime = Depends(get_agent_runtime)

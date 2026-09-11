@@ -72,18 +72,34 @@ class FakeLocator:
         self.filled.append(text)
         self.page.value = text
 
+    def input_value(self) -> str:
+        return self.page.value
+
     def press(self, key: str) -> None:
         self.presses.append(key)
         if key == "Backspace":
             self.page.value = ""
+        elif key == "Control+V":
+            self.page.value = self.page.clipboard
         elif key == "Enter":
             self.page.sent.append(self.page.value)
+
+
+class FakeContext:
+    def __init__(self) -> None:
+        self.permissions: list[list[str]] = []
+
+    def grant_permissions(self, permissions) -> None:
+        self.permissions.append(list(permissions))
 
 
 class FakePage:
     def __init__(self) -> None:
         self.keyboard = FakeKeyboard(self)
         self.mouse = FakeMouse()
+        self.context = FakeContext()
+        self.clipboard = ""
+        self.evaluations: list[str] = []
         self.locators: dict[str, FakeLocator] = {}
         self.waits: list[int] = []
         self.clicks: list[str] = []
@@ -101,6 +117,10 @@ class FakePage:
         self.waits.append(ms)
 
     def evaluate(self, script: str, arg=None):
+        self.evaluations.append(script)
+        if "clipboard.writeText" in script:
+            self.clipboard = arg or ""
+            return True
         return [0.0, 0.0]
 
 
@@ -387,6 +407,96 @@ def test_clearing_the_composer_selects_all_then_deletes() -> None:
     assert page.value == ""
 
 
+# ---------------------------------------------------------------------------
+# long prompts are pasted, not typed
+# ---------------------------------------------------------------------------
+
+
+def test_a_long_prompt_is_pasted_not_typed() -> None:
+    page = FakePage()
+    actor = HumanActor(page, fast_policy(), random.Random(1))
+    long_text = "x" * 400
+
+    actor.compose(page.locator("textarea"), long_text)
+
+    assert page.clipboard == long_text, "the text went to the clipboard"
+    assert page.keyboard.typed == [], "nothing was typed character by character"
+    assert page.value == long_text, "the composer holds the whole prompt"
+    assert page.locator("textarea").presses[-1] == "Control+V"
+    assert actor.summary()["actions"]["pasted"] == 1
+
+
+def test_a_short_prompt_is_still_typed() -> None:
+    page = FakePage()
+    actor = HumanActor(page, fast_policy(), random.Random(1))
+
+    actor.compose(page.locator("textarea"), "fix the bug")
+
+    assert page.keyboard.typed == list("fix the bug")
+    assert page.clipboard == ""
+
+
+def test_the_paste_threshold_is_profile_configurable() -> None:
+    page = FakePage()
+    actor = HumanActor(page, fast_policy(paste_threshold_chars=5), random.Random(1))
+
+    actor.compose(page.locator("textarea"), "hello")
+
+    assert page.keyboard.typed == []
+    assert page.clipboard == "hello"
+
+
+def test_a_paste_that_does_not_land_falls_back_to_typing() -> None:
+    """A page that refuses the clipboard must not leave the composer empty."""
+    page = FakePage()
+    locator = page.locator("textarea")
+
+    class Stubborn(FakeLocator):
+        def press(self, key: str) -> None:
+            self.presses.append(key)
+            if key == "Control+V":
+                return  # the paste silently did nothing
+            super().press(key)
+
+    stubborn = Stubborn(page, "textarea", box={"x": 0, "y": 0, "width": 10, "height": 10})
+    actor = HumanActor(page, fast_policy(), random.Random(1))
+
+    actor.compose(stubborn, "hello")
+
+    assert page.keyboard.typed == list("hello"), "it typed the text instead"
+
+
+def test_a_refused_clipboard_fills_instead_of_typing_for_minutes() -> None:
+    """A 5000-character agent prompt must never be typed one key at a time."""
+    page = FakePage()
+
+    def refuse(script: str, arg=None):
+        raise RuntimeError("clipboard blocked")
+
+    page.evaluate = refuse  # type: ignore[assignment]
+    actor = HumanActor(page, fast_policy(), random.Random(1))
+
+    actor.compose(page.locator("textarea"), "y" * 5000)
+
+    assert page.keyboard.typed == [], "typing was skipped"
+    assert page.value == "y" * 5000
+    assert actor.summary()["actions"]["fill_after_failed_paste"] == 1
+
+
+def test_a_short_prompt_still_types_when_the_clipboard_is_refused() -> None:
+    page = FakePage()
+
+    def refuse(script: str, arg=None):
+        raise RuntimeError("clipboard blocked")
+
+    page.evaluate = refuse  # type: ignore[assignment]
+    actor = HumanActor(page, fast_policy(paste_threshold_chars=1000), random.Random(1))
+
+    actor.compose(page.locator("textarea"), "hello")
+
+    assert page.keyboard.typed == list("hello")
+
+
 def test_composing_moves_the_mouse_click_and_then_types() -> None:
     page = FakePage()
     actor = HumanActor(page, fast_policy(typing=(1, 2)), random.Random(2))
@@ -525,6 +635,19 @@ def test_the_conversation_url_is_remembered_after_a_reply(tmp_path: Path) -> Non
     driver.page.url = "about:blank"
     provider.open()
     assert driver.navigations[-1] == "https://chat.example/a/chat/s/abc123"
+
+
+def test_sending_a_long_prompt_pastes_it(tmp_path: Path) -> None:
+    """The agent's prompt is thousands of characters: it must not be typed."""
+    driver = FakeDriver(tmp_path)
+    provider = WebChatProvider(driver, make_profile(human=fast_policy()))
+    provider.open()
+
+    provider.send("z" * 500)
+
+    assert driver.page.clipboard == "z" * 500
+    assert driver.page.keyboard.typed == []
+    assert driver.page.sent == ["z" * 500]
 
 
 def test_sending_to_a_reused_conversation_types_like_a_person(tmp_path: Path) -> None:

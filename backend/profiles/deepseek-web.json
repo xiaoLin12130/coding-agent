@@ -3,7 +3,7 @@
   "description": "Chat with the DeepSeek web app (chat.deepseek.com). Selectors were read off a real DOM dump from this machine; the session lives in the persistent browser profile, so login happens once, by hand.",
   "url": "https://chat.deepseek.com/",
   "verified": false,
-  "notes": "Selectors confirmed against a live page on 2026-09-11: the composer is a <textarea>, the assistant answer body is div.ds-assistant-message-main-content. No stop control was found in the captured DOM, so completion is detected by DOM text stability instead of the stop button disappearing; raise stable_polls before lowering completion.timeout_ms. Login, captcha and risk-control flows are never automated (project rule) - sign in manually in the headed window. The page is driven the way a person drives it (mouse movement, per-character typing with a variable rhythm, pauses); no fingerprint or stealth handling is involved. An open conversation is REUSED by default - pass --new-conversation for a fresh thread. 深度思考 (thinking mode) is switched on before each message by the profile's toggles; its ON marker is aria-pressed='true' on div.ds-toggle-button.",
+  "notes": "Selectors confirmed against a live page on 2026-09-11: the composer is a <textarea>, the assistant answer body is div.ds-assistant-message-main-content. No stop control was found in the captured DOM, so completion is detected by DOM text stability instead of the stop button disappearing; raise stable_polls before lowering completion.timeout_ms. Login, captcha and risk-control flows are never automated (project rule) - sign in manually in the headed window. The page is driven the way a person drives it (mouse movement, per-character typing with a variable rhythm, pauses); no fingerprint or stealth handling is involved. An open conversation is REUSED by default - pass --new-conversation for a fresh thread. 深度思考 (thinking mode) is switched on before each message by the profile's toggles; its ON marker is aria-pressed='true' on div.ds-toggle-button. stable_polls=8: a long code block can stop growing for a few seconds while the page renders it, and capturing it mid-render produced a truncated answer (two parse failures in a live run) - the parse retry recovered, but the wait is cheaper. ignore_selectors strip the code-block banner (language label + copy/download buttons) from the captured reply. code_block_selector: code blocks are read with textContent, because innerText folds the indentation of a rendered block (a captured Python file came back with 1 space instead of 4 and every generated file failed to import).",
   "ready_selector": "textarea",
   "input_selector": "textarea",
   "send_button_selector": null,
@@ -20,8 +20,8 @@
     "timeout_ms": 180000,
     "start_timeout_ms": 30000,
     "poll_interval_ms": 500,
-    "stable_polls": 6,
-    "min_wait_ms": 1000
+    "stable_polls": 8,
+    "min_wait_ms": 1200
   },
   "human": {
     "enabled": true,
@@ -52,5 +52,11 @@
       "enabled": true,
       "description": "DeepSeek's thinking mode. Switched ON before every message: the page keeps whatever the last session left behind, and the agent wants the model's reasoning rather than a quick guess."
     }
-  ]
+  ],
+  "ignore_selectors": [
+    "div.md-code-block-banner-wrap",
+    "div[role='button']",
+    "button"
+  ],
+  "code_block_selector": "div.md-code-block"
 }

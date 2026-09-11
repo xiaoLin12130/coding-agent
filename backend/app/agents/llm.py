@@ -161,6 +161,37 @@ class BrowserModel:
             },
         )
 
+    def complete_stream(self, prompt: str, system: str | None = None, on_delta=None) -> ModelReply:
+        """complete(), reporting the answer while the page is still writing it.
+
+        The provider owns the polling; this only adapts it. 'on_delta(text,
+        reset)' is forwarded as-is, so a caller renders the text as it arrives
+        instead of waiting for the whole reply.
+        """
+        text = prompt if not system else system + "\n\n" + prompt
+        provider = self.provider
+        if on_delta is None or not hasattr(provider, "ask_stream"):
+            return self.complete(prompt, system=system)
+        try:
+            reply = provider.ask_stream(text, on_delta)
+        except Exception as exc:  # noqa: BLE001 - surfaced as a model error
+            raise ModelClientError("the browser provider failed: " + str(exc)) from exc
+        self.last_reply = reply
+        captured = (reply.text or "").strip()
+        if not captured:
+            raise ModelClientError("the model returned an empty reply")
+        return ModelReply(
+            text=captured,
+            source="model",
+            duration_ms=getattr(reply, "duration_ms", 0),
+            meta={
+                "completed": getattr(reply, "completed", None),
+                "timed_out": getattr(reply, "timed_out", None),
+                "capture_source": getattr(reply, "source", None),
+                "streamed": True,
+            },
+        )
+
     def snapshot(self) -> dict[str, Any]:
         return {}
 

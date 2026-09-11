@@ -912,6 +912,35 @@ clicked when the marker is missing, and a click that does not produce the marker
 raises instead of pretending to have worked. The DeepSeek profile ships with
 thinking mode on by default.
 
+## Reading a reply is not reading rendered text (M12)
+
+Two defects found by driving a real site, both about capture fidelity:
+
+* **indentation** — `innerText` is the RENDERED text, and a rendered code block
+  can fold the leading whitespace of every line. A Python file the model wrote
+  with four-space indentation arrived with one space, so no generated file could
+  be imported (the model itself reported it). A profile's
+  `code_block_selector` makes the reader take each code block's `textContent`
+  and the rest of the answer from `innerText`;
+* **chrome** — the answer element contains the page's own controls (a code
+  block's language label and its copy/download buttons), which were captured as
+  part of the model's text and injected into tool calls. `ignore_selectors`
+  hides them for the duration of the read.
+
+```jsonc
+"assistant_message_selector": "div.ds-assistant-message-main-content",
+"code_block_selector": "div.md-code-block",
+"ignore_selectors": ["div.md-code-block-banner-wrap", "div[role='button']", "button"]
+```
+
+## Long prompts are pasted
+
+A person pastes a 5 000-character prompt; nobody types it. Text at or above
+`human.paste_threshold_chars` goes through the clipboard (written, awaited,
+verified), and if the paste cannot be made to work the composer is filled rather
+than typed character by character — the first version fell back to typing a
+4 800-character agent prompt at human speed, which is minutes per step.
+
 ## Shipped profiles
 
 | Profile | What it drives |

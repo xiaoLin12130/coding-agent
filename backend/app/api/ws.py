@@ -10,6 +10,8 @@ already shipped and the console needs the richer one:
 Client frames:
 
     {"type": "chat", "content": "..."}                      echo (M0)
+    {"type": "ask", "content": "..."}                      one question -> the real model,
+                                                           streamed back as assistant_delta
     {"type": "run", "task": "...", "mode": "single|multi", ...}
     {"type": "stop", "run_id": "..."}
     {"type": "confirm", "request_id": "...", "choice": "reject|once|session"}
@@ -71,6 +73,7 @@ EVENT_NAMES = {
     # regression suite, whose WS case waited forever for "done").
     "done": "done",
     "error": "error",
+    "assistant_delta": "assistant_delta",
 }
 
 # docs/api-protocol.md names the events a client may receive.
@@ -191,6 +194,30 @@ async def websocket_endpoint(
                     continue
                 await websocket.send_json(
                     MessageOutbound(message=chat_service.handle(inbound)).model_dump(mode="json")
+                )
+                continue
+
+            if kind == "ask":
+                try:
+                    record = runtime.ask(str(raw.get("content", "")))
+                except (RuntimeError, ValueError) as exc:
+                    await websocket.send_json(
+                        ErrorOutbound(
+                            error=ErrorInfo(code="ask_rejected", message=str(exc))
+                        ).model_dump(mode="json")
+                    )
+                    continue
+                await websocket.send_json(
+                    {
+                        "event": "agent_update",
+                        "timestamp": datetime.now(timezone.utc).isoformat(),
+                        "session_id": current_session(),
+                        "payload": {
+                            "status": "asking",
+                            "run_id": record.run_id,
+                            "question": record.task[:400],
+                        },
+                    }
                 )
                 continue
 

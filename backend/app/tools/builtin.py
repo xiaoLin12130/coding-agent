@@ -78,6 +78,35 @@ class ToolOutcome:
     artifacts: list[str] = field(default_factory=list)
 
 
+def kill_process_tree(process: "subprocess.Popen") -> None:
+    """Kill a shell command AND everything it started.
+
+    A test runner that spawns a server, a command that backgrounds a watcher:
+    killing only the shell leaves them running and holding the pipes, so the
+    caller never sees an answer. On Windows taskkill /T walks the tree; on POSIX
+    the process group does.
+    """
+    if process.poll() is not None:
+        return
+    try:
+        if os.name == "nt":
+            subprocess.run(
+                ["taskkill", "/F", "/T", "/PID", str(process.pid)],
+                capture_output=True,
+                text=True,
+            )
+        else:  # pragma: no cover - the suite runs on Windows
+            import signal
+
+            os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+    except Exception:
+        pass
+    try:
+        process.kill()
+    except Exception:
+        pass
+
+
 def clip_output(text: str, limit: int = MAX_OUTPUT_CHARS) -> str:
     if len(text) <= limit:
         return text
@@ -435,28 +464,47 @@ def build_default_registry(
             raise ToolExecutionError("working directory does not exist: " + str(cwd))
         started = time.monotonic()
         try:
-            completed = subprocess.run(
+            # Popen + communicate rather than subprocess.run: on Windows the
+            # timeout of run() kills only the shell, and a grandchild that
+            # inherited the stdout pipe keeps it open, so communicate() waits
+            # forever. A generated test that starts an HTTP server hung a real
+            # run for minutes with the whole run frozen behind it. Here the
+            # process TREE is killed, which is what closes the pipe.
+            process = subprocess.Popen(
                 args.command,
                 shell=True,
                 cwd=str(cwd),
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 text=True,
                 encoding="utf-8",
                 errors="replace",
-                timeout=args.timeout_ms / 1000,
             )
-        except subprocess.TimeoutExpired as exc:
-            # A timeout is the one shell failure worth another attempt.
-            raise ToolExecutionError(
-                "command timed out after " + str(args.timeout_ms) + " ms",
-                retryable=True,
-            ) from exc
         except OSError as exc:
             raise ToolExecutionError(
                 "could not run the command: " + str(exc), retryable=True
             ) from exc
 
+        try:
+            stdout, stderr = process.communicate(timeout=args.timeout_ms / 1000)
+        except subprocess.TimeoutExpired as exc:
+            kill_process_tree(process)
+            try:
+                process.communicate(timeout=5)
+            except subprocess.TimeoutExpired:  # pragma: no cover - pipes held open
+                pass
+            # A timeout is the one shell failure worth another attempt.
+            raise ToolExecutionError(
+                "command timed out after "
+                + str(args.timeout_ms)
+                + " ms (the process tree was killed)",
+                retryable=True,
+            ) from exc
+
         duration_ms = int((time.monotonic() - started) * 1000)
+        completed = subprocess.CompletedProcess(
+            args.command, process.returncode, stdout, stderr
+        )
         body = ""
         if completed.stdout:
             body += "stdout:\n" + completed.stdout

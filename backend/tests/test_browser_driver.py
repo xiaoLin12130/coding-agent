@@ -99,3 +99,95 @@ def test_artifact_store_isolates_runs(tmp_path: Path) -> None:
     assert (store.run_dir / "note.txt").read_text(encoding="utf-8") == "hello"
     assert store.next_path("shot", ".png").name == "shot-1.png"
     assert store.next_path("shot", ".png").name == "shot-2.png"
+
+# --- reading an answer that contains page chrome (M12) ---------------------
+
+
+CHROME_PAGE = """
+<!doctype html>
+<html><body>
+<div id="answer">
+  <div class="md-code-block">
+    <div class="md-code-block-banner-wrap">
+      <span class="lang">python</span>
+      <div role="button" class="copy">复制</div>
+      <div role="button" class="download">下载</div>
+    </div>
+    <pre><code>def add(a, b):
+    return a + b</code></pre>
+  </div>
+</div>
+</body></html>
+"""
+
+
+def test_reading_an_answer_can_leave_out_the_page_chrome(driver) -> None:
+    """The code-block banner must not become part of the model's reply."""
+    driver.page.set_content(CHROME_PAGE)
+
+    raw = driver.last_text("#answer")
+    assert "复制" in raw and "python" in raw, "the chrome is really inside the element"
+
+    clean = driver.last_text(
+        "#answer", ignore_selectors=["div.md-code-block-banner-wrap", "div[role='button']"]
+    )
+    assert "复制" not in clean and "下载" not in clean
+    assert "python" not in clean, "the language label is chrome too"
+    assert "def add(a, b):" in clean
+    assert "    return a + b" in clean, "the indentation survives"
+    # and the page is left as it was
+    assert "复制" in driver.last_text("#answer")
+
+
+def test_reading_an_answer_without_ignore_selectors_is_unchanged(driver) -> None:
+    driver.page.set_content(CHROME_PAGE)
+    assert driver.last_text("#answer") == driver.last_text("#answer", ignore_selectors=[])
+
+# --- code blocks are read exactly (M12) ------------------------------------
+
+
+CODE_PAGE = """
+<!doctype html>
+<html><head><style>
+  /* the site's own styling is what folds the rendered indentation */
+  .md-code-block pre { white-space: pre-wrap; }
+</style></head><body>
+<div id="answer">
+  <p>Here is the file:</p>
+  <div class="md-code-block">
+    <div class="md-code-block-banner-wrap"><span>python</span>
+      <div role="button">复制</div></div>
+    <pre><code>def add(a, b):
+    return a + b
+
+
+def sub(a, b):
+    return a - b</code></pre>
+  </div>
+  <p>That is all.</p>
+</div>
+</body></html>
+"""
+
+
+def test_a_code_block_is_read_with_its_real_text(driver) -> None:
+    driver.page.set_content(CODE_PAGE)
+
+    text = driver.answer_text(
+        "#answer",
+        ignore_selectors=["div.md-code-block-banner-wrap", "div[role='button']"],
+        code_block_selector="div.md-code-block",
+    )
+
+    assert "def add(a, b):" in text
+    assert "    return a + b" in text, "the indentation of the code survived"
+    assert "    return a - b" in text
+    assert "复制" not in text
+    assert "Here is the file:" in text, "the prose around it is still there"
+    assert "That is all." in text
+
+
+def test_without_a_code_block_selector_the_reader_stays_on_inner_text(driver) -> None:
+    driver.page.set_content(CODE_PAGE)
+    text = driver.answer_text("#answer")
+    assert "def add(a, b):" in text

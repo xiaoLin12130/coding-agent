@@ -9,7 +9,8 @@
  * Every inbound frame is DATA: malformed frames are reported through the
  * notice channel and dropped. They never throw out of the socket handlers.
  *
- * Client frames: chat | run | stop | confirm | snapshot.
+ * Client frames: chat (M0 echo) | ask (the real model, streamed) | run | stop |
+ * confirm | snapshot.
  */
 
 import type { JsonValue } from "../api/schema";
@@ -33,6 +34,7 @@ export type WebSocketFactory = (url: string) => WebSocketLike;
 /** Every frame the console can send. */
 export type ChatClientFrame =
   | { type: "chat"; content: string }
+  | { type: "ask"; content: string }
   | {
       type: "run";
       task: string;

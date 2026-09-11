@@ -41,6 +41,11 @@ from .tools import Executor, ToolContext, build_default_registry
 
 EVENT_BUFFER = 500
 CONFIRM_TIMEOUT_SECONDS = 300
+# Steps one console run gets when the caller does not say. A real project task
+# (several files, a failing test, a fix and a re-run) does not fit in the loop's
+# own default of 25: a live run built four files and then hit the limit exactly
+# while fixing its own broken test.
+DEFAULT_MAX_STEPS = 40
 
 
 def _now() -> datetime:
@@ -290,6 +295,101 @@ class AgentRuntime:
         self._thread.start()
         return record
 
+    def ask(self, text: str) -> RunRecord:
+        """Answer one question with the model, streaming the words as they come.
+
+        This is not an agent run: no tools, no task, no executor. It exists so a
+        question typed in the console reaches the real model and the console
+        shows the answer WHILE it is written, which is what a chat is.
+        """
+        if self.running:
+            raise RuntimeError("a run is already in progress")
+        question = (text or "").strip()
+        if not question:
+            raise ValueError("the question must not be empty")
+
+        run_id = uuid.uuid4().hex[:12]
+        record = RunRecord(run_id, question, "ask")
+        with self._lock:
+            self._record = record
+            self._history.append(record)
+            self._events.clear()
+        self._stop.clear()
+        self._idle.clear()
+        self._thread = threading.Thread(
+            target=self._answer, args=(record, question), name="agent-ask-" + run_id, daemon=True
+        )
+        self._thread.start()
+        return record
+
+    def _answer(self, record: RunRecord, question: str) -> None:
+        started = time.monotonic()
+        chunks = 0
+
+        def on_delta(text: str, reset: bool) -> None:
+            nonlocal chunks
+            if not text:
+                return
+            chunks += 1
+            self._publish(
+                safe_event(
+                    "assistant_delta",
+                    0,
+                    message=text[-200:],
+                    data={"text": text, "reset": reset, "run_id": record.run_id},
+                )
+            )
+
+        try:
+            self._publish(
+                safe_event(
+                    "run_start",
+                    0,
+                    message="question: " + question[:200],
+                    data={"run_id": record.run_id, "mode": "ask"},
+                )
+            )
+            model = self._model()
+            stream = getattr(model, "complete_stream", None)
+            if callable(stream):
+                reply = stream(question, on_delta=on_delta)
+            else:
+                reply = model.complete(question)
+                on_delta(reply.text, True)
+            record.status = "completed"
+            record.reason = "the model answered"
+            record.tool_calls = 1
+            # No model_reply here on purpose: the WebSocket maps model_reply to
+            # assistant_delta, so publishing it as well would append the whole
+            # answer a SECOND time after the streamed pieces (found by a test).
+            del reply
+        except Exception as exc:  # noqa: BLE001 - the worker must never crash silently
+            record.status = "error"
+            record.reason = type(exc).__name__ + ": " + str(exc)
+            self._publish(safe_event("error", 0, message=record.reason, ok=False))
+        finally:
+            record.finished_at = _now()
+            record.duration_ms = int((time.monotonic() - started) * 1000)
+            try:
+                self._publish(
+                    safe_event(
+                        "done",
+                        0,
+                        record.status + (": " + record.reason if record.reason else ""),
+                        ok=record.status == "completed",
+                        data={
+                            "status": record.status,
+                            "reason": record.reason,
+                            "run_id": record.run_id,
+                            "mode": "ask",
+                            "chunks": chunks,
+                            "duration_ms": record.duration_ms,
+                        },
+                    )
+                )
+            finally:
+                self._idle.set()
+
     def wait(self, timeout: float | None = None) -> bool:
         """Block until the run settles (used by the tests and the CLI)."""
         return self._idle.wait(timeout)
@@ -330,7 +430,7 @@ class AgentRuntime:
                 limits = OrchestrationLimits(
                     max_rounds=max_rounds or settings.multi_agent.max_rounds,
                     stall_threshold=settings.multi_agent.stall_threshold,
-                    max_steps=max_steps or 25,
+                    max_steps=max_steps or DEFAULT_MAX_STEPS,
                 )
                 orchestrator = AgentOrchestrator(
                     self._model(),
@@ -357,7 +457,7 @@ class AgentRuntime:
                     self.sessions,
                     builder=self.builder,
                     limits=LoopLimits(
-                        max_steps=max_steps or 25,
+                        max_steps=max_steps or DEFAULT_MAX_STEPS,
                         timeout_ms=settings.confirmation.ttl_seconds * 20_000,
                     ),
                     checkpoints=checkpoints,

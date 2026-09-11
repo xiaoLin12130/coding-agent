@@ -48,9 +48,11 @@ describe("socket wiring", () => {
     });
   });
 
-  it("sends a chat frame for the M0 echo mode", () => {
+  it("asks the configured model when the composer is in chat mode", () => {
+    // "ask" reaches the real provider and the answer streams back; the M0 echo
+    // frame still exists on the wire but is not what the console sends.
     expect(useAppStore.getState().sendChat("hello")).toBe(true);
-    expect(client.sent[0]).toEqual({ type: "chat", content: "hello" });
+    expect(client.sent[0]).toEqual({ type: "ask", content: "hello" });
     expect(useAppStore.getState().sendChat("   ")).toBe(false);
   });
 

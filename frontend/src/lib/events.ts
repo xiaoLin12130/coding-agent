@@ -189,10 +189,14 @@ export function applyFrame(state: TimelineState, frame: ParsedFrame): TimelineSt
     case "assistant_delta": {
       const text = str(payload.text ?? payload.message, "");
       if (text === "") return base;
+      // reset=true means "this is the authoritative text, not an addition": the
+      // provider sends it for a whole captured answer, or when the page replaced
+      // the node it was writing into.
+      const reset = payload.reset === true;
       const messages = [...state.messages];
       const last = messages[messages.length - 1];
       if (last && last.role === "assistant" && last.streaming) {
-        messages[messages.length - 1] = { ...last, content: last.content + text };
+        messages[messages.length - 1] = { ...last, content: reset ? text : last.content + text };
       } else {
         messages.push({
           id: "assistant-" + seq,

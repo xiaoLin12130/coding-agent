@@ -127,12 +127,15 @@ class ContextBuilder:
         state_store: StateStore | None = None,
         budget: ContextBudget | None = None,
         recent_turns: int = 3,
+        max_entry_chars: int = 1_200,
     ) -> None:
         self.transcript = transcript
         self.store = state_store or StateStore()
         self.memory = memory or MemoryStore(self.store)
         self.budget = budget or ContextBudget()
         self.recent_turns = recent_turns
+        # Per-message cap inside the transcript section (see transcript_text).
+        self.max_entry_chars = max_entry_chars
 
     # -- section sources ---------------------------------------------------
 
@@ -152,13 +155,28 @@ class ContextBuilder:
         )
 
     def transcript_text(self, session_id: str) -> str:
+        """The last few turns, with each entry clipped.
+
+        An assistant message that carries a tool call carries the WHOLE call,
+        arguments included: a few 5 KB file writes made the transcript section
+        alone fill the budget, so every step rotated the session and the model
+        lost the tool result it was supposed to react to. Clipping each entry
+        keeps the shape of what happened (who said what, which tool, the start
+        and the end of the payload) without letting one write evict the rest.
+        """
         entries = self.transcript.recent_turns(session_id, self.recent_turns)
-        return "\n".join(
-            f"[{entry.index}] {entry.role}"
-            + (f" ({entry.tool_name})" if entry.tool_name else "")
-            + f": {entry.content}"
-            for entry in entries
-        )
+        lines: list[str] = []
+        for entry in entries:
+            content = entry.content or ""
+            if len(content) > self.max_entry_chars:
+                kept, _clipped = clip(content, self.max_entry_chars, self.budget.head_ratio)
+                content = kept + _omission_marker(len(content) - len(kept))
+            lines.append(
+                f"[{entry.index}] {entry.role}"
+                + (f" ({entry.tool_name})" if entry.tool_name else "")
+                + f": {content}"
+            )
+        return "\n".join(lines)
 
     def history_summary_text(self, session_id: str) -> str:
         summary = self.transcript.summarize(

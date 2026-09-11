@@ -65,6 +65,15 @@ class HumanPolicy(BaseModel):
     typing_max_ms: int = Field(default=190, ge=0, le=2_000)
     typing_fast_chance: float = Field(default=0.72, ge=0, le=1)
     key_pause_chance: float = Field(default=0.08, ge=0, le=1)
+    # Text at least this long is PASTED, not typed: a person pastes a long
+    # prompt, and a page that receives thousands of synthetic keystrokes
+    # re-renders on every one of them.
+    paste_threshold_chars: int = Field(default=220, ge=1)
+    paste_key: str = "Control+V"
+    paste_min_ms: int = Field(default=120, ge=0, le=10_000)
+    paste_max_ms: int = Field(default=400, ge=0, le=10_000)
+    paste_settle_min_ms: int = Field(default=150, ge=0, le=10_000)
+    paste_settle_max_ms: int = Field(default=450, ge=0, le=10_000)
     key_pause_min_ms: int = Field(default=120, ge=0, le=5_000)
     key_pause_max_ms: int = Field(default=420, ge=0, le=5_000)
     pause_characters: list[str] = Field(
@@ -90,6 +99,8 @@ class HumanPolicy(BaseModel):
             ("typing_fast_max_ms", "typing_slow_min_ms"),
             ("typing_slow_min_ms", "typing_max_ms"),
             ("key_pause_min_ms", "key_pause_max_ms"),
+            ("paste_min_ms", "paste_max_ms"),
+            ("paste_settle_min_ms", "paste_settle_max_ms"),
             ("think_min_ms", "think_max_ms"),
             ("pre_send_min_ms", "pre_send_max_ms"),
             ("settle_min_ms", "settle_max_ms"),
@@ -145,6 +156,15 @@ class ProviderProfile(BaseModel):
     copy_status_selector: str | None = None
     login_required_selector: str | None = None
     login_indicator_selector: str | None = None
+    # Page chrome inside the answer element that must NOT be part of the reply:
+    # a code block's language label and its copy/download buttons are rendered
+    # inside the answer, so capturing the element verbatim injected
+    # "python / 复制 / 下载" into the model's text (and into tool calls).
+    ignore_selectors: list[str] = Field(default_factory=list)
+    # The element that wraps a code block on this site. When set, code blocks are
+    # captured with textContent so their indentation survives (see
+    # BrowserDriver.answer_text).
+    code_block_selector: str | None = None
 
     network_response_patterns: list[str] = Field(default_factory=list)
     network_text_path: str = "delta"

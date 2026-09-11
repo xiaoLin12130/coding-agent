@@ -47,7 +47,7 @@ describe("ChatPanel", () => {
     await user.click(screen.getByTestId("composer-mode-chat"));
     await user.type(screen.getByLabelText("Message"), "ping{Enter}");
 
-    await waitFor(() => expect(client.sent).toContainEqual({ type: "chat", content: "ping" }));
+    await waitFor(() => expect(client.sent).toContainEqual({ type: "ask", content: "ping" }));
   });
 
   it("accumulates assistant_delta frames into one streaming message", async () => {

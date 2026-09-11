@@ -133,6 +133,68 @@ class HumanActor:
             except Exception:  # pragma: no cover - nothing left to try
                 pass
 
+    # -- long text ---------------------------------------------------------
+
+    def should_paste(self, text: str) -> bool:
+        """Long text is pasted, not typed - that is what a person does.
+
+        Nobody types three thousand characters one by one, and a page that gets
+        thousands of synthetic keystrokes re-renders on every one of them.
+        """
+        return self.policy.enabled and len(text) >= self.policy.paste_threshold_chars
+
+    def copy_text(self, text: str) -> bool:
+        """Put text on the clipboard ('' means the page refused)."""
+        try:
+            self.page.context.grant_permissions(["clipboard-read", "clipboard-write"])
+        except Exception:
+            pass
+        try:
+            # the promise MUST be awaited: a fire-and-forget write raced the
+            # paste and the composer received nothing (found by a real run, where
+            # the fallback then typed a 4800-character prompt character by
+            # character - minutes per step)
+            result = self.page.evaluate(
+                "async (t) => { await navigator.clipboard.writeText(t); return true; }", text
+            )
+            return bool(result)
+        except Exception:
+            return False
+
+    def paste(self, locator: Any, text: str) -> bool:
+        """Click, clear, paste, and verify the composer really holds the text."""
+        try:
+            self.click(locator)
+            self.think()
+            self.clear(locator)
+            for _attempt in range(2):
+                if not self.copy_text(text):
+                    return False
+                self.pause(self.policy.paste_min_ms, self.policy.paste_max_ms)
+                locator.press(self.policy.paste_key)
+                self.pause(self.policy.paste_settle_min_ms, self.policy.paste_settle_max_ms)
+                value = self.value_of(locator)
+                if value is None or text in value:
+                    break
+            else:
+                return False
+        except Exception:
+            return False
+        self.events.append(("pasted", len(text)))
+        return True
+
+    def value_of(self, locator: Any) -> str | None:
+        """What the composer currently holds, when the page can say."""
+        for reader in ("input_value", "value"):
+            method = getattr(locator, reader, None)
+            if callable(method):
+                try:
+                    value = method()
+                    return value if isinstance(value, str) else None
+                except Exception:
+                    return None
+        return None
+
     def compose(self, locator: Any, text: str) -> None:
         """Everything a person does to send a message, in order.
 
@@ -144,6 +206,18 @@ class HumanActor:
             locator.fill(text)
             self.events.append(("fill", len(text)))
             return
+        if self.should_paste(text):
+            if self.paste(locator, text):
+                return
+            # A paste that cannot be made to work must not turn into minutes of
+            # typing: fill the composer and record that the human path was
+            # skipped, instead of pretending the slow path is the same thing.
+            try:
+                locator.fill(text)
+                self.events.append(("fill_after_failed_paste", len(text)))
+                return
+            except Exception:
+                pass
         self.click(locator)
         self.think()
         self.clear(locator)

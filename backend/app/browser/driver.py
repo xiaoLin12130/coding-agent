@@ -78,6 +78,18 @@ class BrowserDriver:
             )
         except Exception as exc:
             self.close()
+            message = str(exc)
+            if "Target page, context or browser has been closed" in message or (
+                "existing browser session" in message
+            ):
+                # Chromium refuses a second instance on a user-data-dir it
+                # already owns, and the failure surfaces as a closed target.
+                raise BrowserError(
+                    "the browser profile "
+                    + str(self.profile_dir)
+                    + " is already in use by another process; close that browser "
+                    "(or use a different profile directory) and retry"
+                ) from exc
             raise BrowserError(
                 f"could not launch {self.browser_name}: {exc}"
             ) from exc
@@ -157,16 +169,112 @@ class BrowserDriver:
         except Exception:
             return False
 
-    def last_text(self, selector: str, timeout_ms: int = 2_000) -> str:
-        """Text of the last element matching selector ('' when absent)."""
+    def last_text(
+        self,
+        selector: str,
+        timeout_ms: int = 2_000,
+        ignore_selectors: list[str] | None = None,
+    ) -> str:
+        """Text of the last element matching selector ('' when absent).
+
+        'ignore_selectors' are hidden for the duration of the read, so chrome
+        rendered INSIDE the answer (a code block's language label and its copy
+        button) does not become part of the reply. Hiding and restoring is used
+        instead of cloning because innerText of a detached node has no layout.
+        """
         try:
             locator = self.page.locator(selector)
             count = locator.count()
             if count == 0:
                 return ""
-            return locator.nth(count - 1).inner_text(timeout=timeout_ms).strip()
+            if not ignore_selectors:
+                return locator.nth(count - 1).inner_text(timeout=timeout_ms).strip()
+            text = self.page.evaluate(
+                """(args) => {
+                    const nodes = document.querySelectorAll(args.selector);
+                    if (!nodes.length) return "";
+                    const node = nodes[nodes.length - 1];
+                    const hidden = [];
+                    for (const sel of args.ignore) {
+                        for (const el of node.querySelectorAll(sel)) {
+                            hidden.push([el, el.style.display]);
+                            el.style.display = "none";
+                        }
+                    }
+                    let text = "";
+                    try {
+                        text = node.innerText || "";
+                    } finally {
+                        for (const [el, previous] of hidden) el.style.display = previous;
+                    }
+                    return text.trim();
+                }""",
+                {"selector": selector, "ignore": list(ignore_selectors)},
+            )
+            return text if isinstance(text, str) else ""
         except Exception:
             return ""
+
+    def answer_text(
+        self,
+        selector: str,
+        ignore_selectors: list[str] | None = None,
+        code_block_selector: str | None = None,
+    ) -> str:
+        """The answer as text, with code blocks read EXACTLY.
+
+        innerText is the rendered text: inside a code block the page's own
+        styling can fold the leading whitespace of every line, so a captured
+        Python file came back with one space of indentation instead of four and
+        the agent wrote files that would not even import. A code block's
+        textContent is the real text, so each block is read that way and the
+        rest of the answer still comes from innerText.
+        """
+        if not code_block_selector:
+            return self.last_text(selector, ignore_selectors=ignore_selectors)
+        try:
+            text = self.page.evaluate(
+                """(args) => {
+                    const nodes = document.querySelectorAll(args.selector);
+                    if (!nodes.length) return "";
+                    const node = nodes[nodes.length - 1];
+                    const hidden = [];
+                    for (const sel of args.ignore) {
+                        for (const el of node.querySelectorAll(sel)) {
+                            hidden.push([el, el.style.display]);
+                            el.style.display = "none";
+                        }
+                    }
+                    let out = "";
+                    try {
+                        const children = node.children.length ? Array.from(node.children) : [node];
+                        const parts = [];
+                        for (const child of children) {
+                            const isCode = child.matches && child.matches(args.code);
+                            const block = isCode ? child : (child.querySelector ? child.querySelector(args.code) : null);
+                            const pre = block && block.querySelector ? block.querySelector("pre") : null;
+                            if (pre && pre.textContent.trim()) {
+                                parts.push(pre.textContent.replace(/\n+$/, ""));
+                            } else {
+                                const text = child.innerText || "";
+                                if (text.trim()) parts.push(text);
+                            }
+                        }
+                        out = parts.join("\n\n");
+                    } finally {
+                        for (const [el, previous] of hidden) el.style.display = previous;
+                    }
+                    return out.trim();
+                }""",
+                {
+                    "selector": selector,
+                    "ignore": list(ignore_selectors or []),
+                    "code": code_block_selector,
+                },
+            )
+            return text if isinstance(text, str) else ""
+        except Exception:
+            return self.last_text(selector, ignore_selectors=ignore_selectors)
 
     def click_last(self, selector: str, timeout_ms: int = 5_000) -> bool:
         try:

@@ -195,8 +195,10 @@ class WebChatProvider(ProviderAdapter):
         self._capture_since = self.driver.network_cursor()
         try:
             composer = page.locator(self.profile.input_selector).last
-            # Move to the composer, click it, clear the draft, type the message
-            # (app/browser/human.py); with the policy disabled this is one fill.
+            # Move to the composer, click it, clear the draft, then type the
+            # message - or PASTE it when it is long, which is what a person does
+            # with a multi-kilobyte prompt (app/browser/human.py). With the
+            # policy disabled this is a single fill.
             self.human.compose(composer, text)
             if self.profile.send_button_selector:
                 self.human.click(page.locator(self.profile.send_button_selector).last)
@@ -205,7 +207,31 @@ class WebChatProvider(ProviderAdapter):
         except Exception as exc:
             raise ProviderError(f"could not send the prompt: {exc}") from exc
 
-    def wait_until_complete(self, timeout_ms: int | None = None) -> CompletionTimeline:
+    def ask_stream(
+        self,
+        prompt: str,
+        on_delta,
+        timeout_ms: int | None = None,
+        new_conversation: bool = False,
+    ):
+        """ask(), reporting the answer WHILE the page writes it.
+
+        Not a second implementation: the completion detector already polls the
+        page every poll_interval_ms, so that same loop is what reports the text
+        as it grows. A separate loop that waited for a fixed budget made every
+        question take completion.timeout_ms (found by asking a real question
+        through the console: a 10 second answer took three minutes to surface).
+        """
+        return self.ask(
+            prompt,
+            timeout_ms=timeout_ms,
+            new_conversation=new_conversation,
+            on_delta=on_delta,
+        )
+
+    def wait_until_complete(
+        self, timeout_ms: int | None = None, on_delta=None
+    ) -> CompletionTimeline:
         policy = self.profile.completion
         budget = policy.timeout_ms if timeout_ms is None else timeout_ms
         started_at = datetime.now(timezone.utc)
@@ -220,10 +246,26 @@ class WebChatProvider(ProviderAdapter):
         stop_seen = False
         generation_started = False
 
+        emitted = ""
+
+        def report(text: str) -> None:
+            """Hand the new part of the answer to the caller, if any."""
+            nonlocal emitted
+            if on_delta is None or not text:
+                return
+            if text.startswith(emitted) and len(text) > len(emitted):
+                on_delta(text[len(emitted):], False)
+                emitted = text
+            elif not text.startswith(emitted):
+                # the page replaced the node instead of extending it
+                on_delta(text, True)
+                emitted = text
+
         # Phase 1: wait until the page visibly starts generating.
         while time.monotonic() < start_deadline:
             stop_visible = self._stop_visible()
             text = self._dom_text()
+            report(text)
             if stop_visible or len(text) > 0:
                 generation_started = True
                 stop_seen = stop_seen or stop_visible
@@ -248,6 +290,7 @@ class WebChatProvider(ProviderAdapter):
         # Phase 2: multi-signal completion detection.
         while time.monotonic() < deadline:
             text = self._dom_text()
+            report(text)
             length = len(text)
             stop_visible = self._stop_visible()
             stop_seen = stop_seen or stop_visible
@@ -310,7 +353,14 @@ class WebChatProvider(ProviderAdapter):
         return self.driver.is_visible(self.profile.stop_button_selector)
 
     def _dom_text(self) -> str:
-        return self.driver.last_text(self.profile.assistant_message_selector)
+        # The answer element contains page chrome (a code block's language label
+        # and its copy/download buttons) and code blocks whose rendered text has
+        # folded indentation; the profile says how to read both correctly.
+        return self.driver.answer_text(
+            self.profile.assistant_message_selector,
+            ignore_selectors=self.profile.ignore_selectors,
+            code_block_selector=self.profile.code_block_selector,
+        )
 
     def _capture_from_network(self) -> CapturedText | None:
         patterns = self.profile.network_response_patterns
