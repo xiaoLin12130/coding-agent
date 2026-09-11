@@ -90,7 +90,14 @@ class ContextBudget(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    max_chars: int = Field(default=28_000, gt=0)
+    # 80k characters, measured rather than guessed: the composer of the shipped
+    # web provider accepted 127 517 characters in one paste (M14 probe), and the
+    # old 28k budget was smaller than one multi-step session - the transcript
+    # plus a couple of tool results filled it, so the session rotated at almost
+    # every step and the model lost the result it was supposed to react to.
+    # A budget this size leaves room for a real project's state, memory and the
+    # last few turns without letting one giant tool result evict everything.
+    max_chars: int = Field(default=80_000, gt=0)
     min_section_chars: int = Field(default=200, gt=0)
     head_ratio: float = Field(default=0.7, gt=0, le=1)
     never_drop: tuple[str, ...] = ("system", "task")

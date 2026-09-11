@@ -60,6 +60,9 @@ class BrowserDriver:
         self._responses: list[CapturedResponse] = []
         self._response_objects: dict[str, object] = {}
         self._finished_urls: set[str] = set()
+        # Requests that started and have not finished yet. A page that is still
+        # generating keeps one of these open (see WebChatProvider.is_generating).
+        self._inflight: dict[str, str] = {}
 
     # -- lifecycle ---------------------------------------------------------
 
@@ -96,6 +99,7 @@ class BrowserDriver:
         pages = self._context.pages
         self._page = pages[0] if pages else self._context.new_page()
         self._page.set_default_timeout(self.default_timeout_ms)
+        self._page.on("request", self._on_request_started)
         self._page.on("response", self._on_response)
         self._page.on("requestfinished", self._on_request_finished)
         self._page.on("requestfailed", self._on_request_finished)
@@ -333,11 +337,31 @@ class BrowserDriver:
         except Exception:
             return
 
+    def _on_request_started(self, request) -> None:
+        try:
+            self._inflight[request.url] = request.resource_type
+        except Exception:
+            return
+
     def _on_request_finished(self, request) -> None:
         try:
             self._finished_urls.add(request.url)
+            self._inflight.pop(request.url, None)
         except Exception:
             return
+
+    def inflight(self, url_patterns: list[str] | None = None) -> list[str]:
+        """URLs whose request started and has not finished.
+
+        This is the page's own truth about "still working": an answer that is
+        still being written keeps its request open, even while the visible text
+        does not change (a model thinking before it writes, or a long block that
+        has not been rendered yet).
+        """
+        urls = list(self._inflight)
+        if not url_patterns:
+            return urls
+        return [url for url in urls if any(re.search(p, url) for p in url_patterns)]
 
     def network_cursor(self) -> int:
         """Index of the next response; pass it as 'since' to ignore earlier ones."""

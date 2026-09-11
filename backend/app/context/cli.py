@@ -246,7 +246,7 @@ def build_parser() -> argparse.ArgumentParser:
     p.add_argument("--task", default="", help="the current task")
     p.add_argument("--system", default="You are a helpful software engineer assistant.")
     p.add_argument("--memory-query", default=None)
-    p.add_argument("--budget", type=int, default=28_000)
+    p.add_argument("--budget", type=int, default=80_000)
     p.add_argument("--min-section", type=int, default=200)
     p.add_argument("--recent-turns", type=int, default=3)
     p.add_argument("--show", type=int, default=0, help="also print N chars of each section")

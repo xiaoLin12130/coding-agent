@@ -127,7 +127,7 @@ class ContextBuilder:
         state_store: StateStore | None = None,
         budget: ContextBudget | None = None,
         recent_turns: int = 3,
-        max_entry_chars: int = 1_200,
+        max_entry_chars: int = 4_000,
     ) -> None:
         self.transcript = transcript
         self.store = state_store or StateStore()

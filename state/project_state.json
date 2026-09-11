@@ -1,27 +1,31 @@
 {
-  "current_milestone": "M13",
+  "current_milestone": "M14",
   "current_task": null,
-  "goal": "M13 — Chinese console: every user-facing string in the Web UI is Chinese, with the wire values unchanged.",
-  "milestone_status": "M0..M12 complete; console localised to Chinese (M13)",
+  "goal": "M14 — Never interrupt a live answer, and give the context a budget that fits a real session: the page's own in-flight completion request decides whether the model is still working, and the assembled prompt is allowed the room a real project needs.",
+  "milestone_status": "M0..M14 complete (M14 = never interrupt a live answer + a measured context budget)",
   "todos": [
     {
-      "content": "M13: translate the console shell, panels, tabs, buttons and empty states to Chinese",
+      "content": "M14: detect 'still generating' from the page (in-flight completion request), not from text stability",
       "status": "completed"
     },
     {
-      "content": "M13: add status/label helpers so machine codes never reach the screen untranslated",
+      "content": "M14: send() waits for the page to settle and refuses to interrupt it",
       "status": "completed"
     },
     {
-      "content": "M13: translate the runtime's display text (role purposes, rotation title) without touching prompts",
+      "content": "M14: completion detection requires the page to be idle before it calls an answer finished",
       "status": "completed"
     },
     {
-      "content": "M13: update the tests that asserted on English UI text",
+      "content": "M14: measure the composer capacity and raise the context budget to 80k characters",
       "status": "completed"
     },
     {
-      "content": "M13: verify by dumping the rendered text of every tab in a real browser",
+      "content": "M14: tests for the guard, the detector and the budget regression",
+      "status": "completed"
+    },
+    {
+      "content": "M14: live verification against chat.deepseek.com (a real pause, a second question)",
       "status": "completed"
     }
   ],
@@ -210,7 +214,10 @@
     "frontend/src/components/tools/ConfirmationCard.tsx",
     "frontend/src/components/tools/ToolCard.tsx",
     "frontend/src/components/observability/ObservabilityPanel.tsx",
-    "backend/tests/manual/ui_text_dump.py"
+    "backend/tests/manual/ui_text_dump.py",
+    "backend/tests/test_browser_generating.py",
+    "backend/tests/manual/live_interrupt_check.py",
+    "docs/state-context.md"
   ],
   "tests": [
     {
@@ -356,6 +363,24 @@
       "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/ui_text_dump.py",
       "result": "dumps the rendered text of all nine tabs plus the shell, session list and chat into runs-adjacent ui-text-dump.json; the only English left is DATA (tool names, file paths, backend messages, model output), not UI chrome",
       "date": "2026-09-11"
+    },
+    {
+      "name": "backend pytest (M0..M14), whole suite",
+      "command": "cd backend && ../.venv/Scripts/python.exe -m pytest",
+      "result": "933 passed in 187s (M14 added 13: 10 generating/guard + 3 budget)",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "M14 live check against chat.deepseek.com: no interruption",
+      "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/live_interrupt_check.py",
+      "result": "PASS. While one real answer was being written, 13 of 22 samples showed NO visible text change while the page was still generating - the exact window in which the old detector declared the answer finished. The full 958-character answer was captured, the page was idle afterwards, and a second question left the first answer in place (answers on the page 1 -> 2).",
+      "date": "2026-09-11"
+    },
+    {
+      "name": "composer capacity probe (why the budget is 80k)",
+      "command": "cd backend && ../.venv/Scripts/python.exe tests/manual/live_interrupt_check.py (probe part of the same session)",
+      "result": "the DeepSeek composer has no maxlength and held 127 517 characters in one paste",
+      "date": "2026-09-11"
     }
   ],
   "failures": [
@@ -364,7 +389,9 @@
     "M12 real-environment run (library management system built from the console UI): the generated project was NOT finished. db.py ends up importable, but tests/test_api.py blocks because app.py calls main() at import time, and the agent never fixed it. Every attempt is preserved in H:/AI-game/library-live with its task text and console log.",
     "M12: code captured from the page lost its indentation. innerText folds the leading whitespace of a rendered code block, so a Python file written by the agent arrived with ONE space per level and no generated file could be imported. The model itself reported it ('The write_file tool seems to collapse my indentation'). Fixed by reading code blocks with textContent (profile code_block_selector); the page HTML proves the model's text had 4 spaces.",
     "M12: subprocess.run(timeout=...) does not stop a shell command on Windows. The timeout killed only the shell; a grandchild (the HTTP server a generated test starts) kept the stdout pipe open, so communicate() waited forever and the whole agent run froze for minutes behind one tool call. Fixed with Popen + process-tree kill (taskkill /T).",
-    "M12: two processes sharing one browser profile directory cannot coexist - Chromium attaches to the running instance and Playwright then reports 'Target page, context or browser has been closed'. Now reported as a clear BrowserError naming the profile that is in use."
+    "M12: two processes sharing one browser profile directory cannot coexist - Chromium attaches to the running instance and Playwright then reports 'Target page, context or browser has been closed'. Now reported as a clear BrowserError naming the profile that is in use.",
+    "M12 root cause found in M14: the truncated tool calls that ended two runs with 'the model output could not be parsed' were not a model defect. The completion detector used TEXT STABILITY alone (the profile had no stop-button selector), so an answer that merely paused was declared finished, the next prompt was typed into the page, and the site replaced the answer in flight - leaving half a JSON tool call. Measured on the live site: 13 of 22 samples taken during one answer showed no text change while the page was still generating.",
+    "M12 secondary root cause: the 28 000-character context budget was smaller than one multi-step session, so the session rotated at almost every step and the model lost the tool result it was supposed to react to - which is why it repeated the same failing command instead of reading the file."
   ],
   "decisions": [
     "M1 drives the browser through a selector-driven WebChatProvider fed by JSON provider profiles; site detail never lives in provider or (future) agent code.",
@@ -461,7 +488,12 @@
     "The M12 findings are recorded, not hidden: the web model is unreliable at large structured edits (two consecutive invalid-JSON replies ended runs) and the project it was asked to build is unfinished. The execution chain (parser -> safety -> executor -> loop -> console) held up; the limitations are the model and the site.",
     "The console is a Chinese UI, but the WIRE stays English: tool names, event names, settings keys and enum values (single/multi, ask/auto_once/deny, reject/once/session) are never translated, because they are protocol and storage values. Display goes through statusLabel/backendLabel/connectionLabel in lib/format.ts, and a select shows a Chinese label while sending the English value.",
     "Backend display text was translated where the console shows it verbatim (role purposes, the rotation session title), while the SYSTEM PROMPTS that drive the model were left exactly as they are: those are behaviour, not chrome.",
-    "The localisation was verified by rendering the real UI in a browser and dumping the text of every tab, not by grepping the source: a string inside a conditional or a data array would survive a grep and still reach the screen."
+    "The localisation was verified by rendering the real UI in a browser and dumping the text of every tab, not by grepping the source: a string inside a conditional or a data array would survive a grep and still reach the screen.",
+    "'Still generating' is decided by the PAGE, not by a text heuristic: an in-flight request to the site's completion endpoint (profile generating_patterns) means the answer is still coming. A profile can still name a stop control, which is the second signal; text stability is never used for this decision.",
+    "send() waits for the page to settle (idle_timeout_ms, default 180 s) and RAISES if it never does. Refusing to send is deliberately the failure mode: an interrupted answer costs the whole step, a refused one is visible and recoverable.",
+    "Completion detection requires the page to be idle as well as the text to be stable, and the timeout fallback now says explicitly when the text it returns is partial because the page was still generating.",
+    "The context budget is 80 000 characters because the composer was measured holding 127 517 in one paste, not because 80k sounded reasonable. The test asserts the contrast: the old 28k budget crosses the soft threshold on a live-sized session, the new one does not.",
+    "Per-message clipping inside the transcript rose from 1 200 to 4 000 characters: an assistant message carries its whole tool call, and a single 5 KB file write should not evict the rest of the conversation."
   ],
   "notes": [
     "The only provider exercised end-to-end is the offline fixture (mock profile). Driving a real web LLM needs a profile whose selectors are filled from an 'inspect' run plus a manual login; that remains untested here.",
@@ -500,11 +532,12 @@
     "M10 verified against the real site: chat.deepseek.com drives correctly with the deepseek-web profile (composer is a textarea, the answer body is div.ds-assistant-message-main-content, the thinking switch is div.ds-toggle-button with aria-pressed).",
     "Real web LLM behaviour observed while testing: with thinking mode OFF the model twice answered WITHOUT calling the tool (it replied from the function name, once claiming add sums when the file subtracts); with thinking ON it called read_file. Prompt compliance from a web chat page is not guaranteed, which is why the parser is forgiving and the live check asserts a real tool call.",
     "The off switch for human pacing is profile-level (human.enabled=false) and is used by pages where instant input is correct; the shipped mock profile keeps it ON with a 1-4 ms rhythm so the suite still exercises the human path.",
-    "runs/ now holds live-check artifacts from real DeepSeek sessions (screenshots, DOM dumps, timelines); they are gitignored like every other run artifact."
+    "runs/ now holds live-check artifacts from real DeepSeek sessions (screenshots, DOM dumps, timelines); they are gitignored like every other run artifact.",
+    "M14 answers the M12 question 'why did it keep failing?': two of the three blockers were harness defects (premature capture, context too small), not model defects. The third - the model not fixing app.py - remains a model limitation."
   ],
-  "checkpoint": "M12 checkpoint 2026-09-11: the console drives a real web LLM end to end - ask a question and watch the answer stream in (M11), then run a real project task from the UI (M12). Twelve defects found by doing that were fixed with tests, including the two that mattered most: code captured from the page lost its indentation (every generated file failed to import) and the shell timeout did not actually return on Windows (a generated test that starts a server froze a whole run). 900+ backend tests and 66 frontend tests green; the evaluation suites still pass. The test project itself (H:/AI-game/library-live) is NOT finished: app.py starts the server at import time and the model never fixed it - recorded as a failure, with the model's own output quality as the limiting factor.",
+  "checkpoint": "M14 checkpoint 2026-09-11: the console can no longer talk over a live answer. 'Still generating' comes from the page itself (an in-flight request to the completion endpoint), completion detection refuses to finish while that request is open, and send() waits or refuses instead of typing into it - the live check measured 13 of 22 samples where the answer looked finished but was not, which is what produced the truncated tool calls in M12. The context budget went from 28k to a measured 80k characters (the composer held 127 517), with per-message clipping at 4k, so a real session no longer rotates at every step. 933 backend tests green.",
   "git_branch": "main",
   "cwd": "H:\\AI-game\\coding-agent",
   "git_remote": "https://github.com/xiaoLin12130/coding-agent.git",
-  "git_head": "0fa2e67d83ae70c4ad126beadc551318fc54e0b8"
+  "git_head": "46d1b5a6895eb60e830a127b1ebf6fed9c4c73e6"
 }

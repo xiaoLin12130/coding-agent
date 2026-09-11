@@ -59,6 +59,18 @@
       "value": "run_shell must kill the PROCESS TREE on timeout: subprocess.run(timeout=...) on Windows kills only the shell, and a grandchild that inherited the stdout pipe keeps it open, so communicate() never returns (a generated test that starts an HTTP server froze a whole agent run). app/tools/builtin.py kill_process_tree uses taskkill /F /T; tests/test_tools_shell_timeout.py proves it returns.",
       "source": "M12 real-environment run",
       "updated_at": "2026-09-11"
+    },
+    {
+      "key": "browser.still-generating",
+      "value": "Never send a new prompt while a web LLM is still answering: the site REPLACES the answer in flight, so the previous reply is lost halfway (and a half-written tool call is what the parser rejects as invalid JSON). Decide it from the page: profile generating_patterns (DeepSeek: /api/v0/chat/completion) - an in-flight request there means still generating. Text stability is NOT a completion signal on its own; measured live, 13 of 22 samples during one answer showed no text change while the page was still working. send() waits for idle (idle_timeout_ms) and raises rather than interrupting.",
+      "source": "M14",
+      "updated_at": "2026-09-11"
+    },
+    {
+      "key": "context.budget",
+      "value": "ContextBudget.max_chars is 80 000 characters (measured: the DeepSeek composer held 127 517 in one paste; the old 28k was smaller than one multi-step session, so the session rotated almost every step and the model lost the tool result it had to react to). Per-message clipping in the transcript is 4 000 characters. Soft/hard thresholds stay ratios (0.7/0.9) so they follow the budget.",
+      "source": "M14",
+      "updated_at": "2026-09-11"
     }
   ]
 }

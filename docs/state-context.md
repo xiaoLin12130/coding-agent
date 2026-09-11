@@ -1,5 +1,19 @@
 # State / Context / Memory Specification
 
+## Context 预算（M14）
+
+`ContextBudget.max_chars` 默认 **80 000 字符**，这是量出来的而不是猜的：实测网页端
+输入框一次可接受 127 517 字符；而旧的 28 000 字符预算比一次正常的多步会话还小——
+transcript 加上两三个工具结果就顶到上限，于是几乎每一步都触发会话轮转，轮转之后
+模型就看不到它本该回应的那个工具结果了。
+
+配套调整：`transcript` 中**单条消息**裁剪上限 1 200 → 4 000 字符（一条工具调用自带
+参数，一次 5 KB 写文件的调用不该独占整个预算）。
+
+软/硬阈值仍是预算的**比例**（默认 0.7 / 0.9），所以它们跟着预算一起变大。
+回归测试 `tests/test_context_builder.py::test_a_live_sized_session_no_longer_forces_a_rotation`
+同时断言旧预算下确实会越界、新预算下不会。
+
 ## Context
 
 Context 是：

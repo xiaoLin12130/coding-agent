@@ -263,3 +263,110 @@ def test_memory_query_filters_the_memory_section(tmp_path: Path) -> None:
     assert section is not None
     assert "alpha" in section.content
     assert "beta" not in section.content
+
+# --- the default budget (M14) ----------------------------------------------
+
+
+def _live_sized_session(tmp_path: Path):
+    """A session shaped like the live one that rotated at every step.
+
+    Measured from the M12 run: each step asked for a ~5 KB file write, the tool
+    answered with the file's content, and the project state and memory sat in
+    front of it. At the old 28k budget the assembled context crossed the soft
+    threshold, so the session rotated almost every step and the model lost the
+    result it was supposed to react to.
+    """
+    from app.config import AppPaths
+    from app.storage import StateStore
+
+    paths = AppPaths(
+        project_root=tmp_path,
+        state_dir=tmp_path,
+        project_state_file=tmp_path / "project_state.json",
+        memory_file=tmp_path / "memory.json",
+    )
+    store = StateStore(paths)
+    sessions = SessionManager(tmp_path / "sessions", store=store)
+    builder = ContextBuilder(sessions.transcript, sessions.memory, sessions.store)
+    session_id = sessions.start().active_session_id
+
+    sessions.record("user", "实现图书管理系统：app.py、db.py、static/index.html、tests/test_api.py")
+    for index in range(6):
+        sessions.record(
+            "assistant",
+            '{"name": "write_file", "arguments": {"path": "app.py", "content": "'
+            + ("x" * 5_000)
+            + '"}}',
+        )
+        sessions.record(
+            "tool",
+            "created app.py (" + str(5_000 + index) + " chars)\n" + ("code line\n" * 400),
+            tool_name="write_file",
+        )
+    return builder, session_id
+
+
+def _assemble(builder, session_id: str, budget: int):
+    from app.context.models import ContextBudget
+
+    builder.budget = ContextBudget(max_chars=budget)
+    return builder.build(
+        session_id=session_id,
+        system="You are a coding agent working inside one project directory.",
+        task="实现图书管理系统，并运行测试",
+        tool_results=["created app.py (5017 chars)\n" + ("code line\n" * 400)],
+    )
+
+
+def test_the_default_budget_is_the_measured_one() -> None:
+    assert ContextBudget().max_chars == 80_000
+
+
+def test_a_live_sized_session_no_longer_forces_a_rotation(tmp_path: Path) -> None:
+    """The regression: the old budget put this session over the soft threshold."""
+    builder, session_id = _live_sized_session(tmp_path)
+
+    old = _assemble(builder, session_id, 28_000)
+    new = _assemble(builder, session_id, 80_000)
+
+    old_ratio = old.total_chars / 28_000
+    new_ratio = new.total_chars / 80_000
+    assert old_ratio >= 0.7, "the old budget must really have crossed the soft threshold"
+    assert old.total_chars > 28_000 or old.dropped_sections, (
+        "the old budget truncated or dropped something: " + str(old.dropped_sections)
+    )
+
+    assert new.total_chars <= 80_000
+    assert new.dropped_sections == [], new.dropped_sections
+    assert "transcript" in [section.name for section in new.sections]
+    assert new_ratio < 0.7, (
+        "a normal session must stay under the soft threshold, otherwise every step "
+        "rotates: " + str(round(new_ratio, 3))
+    )
+
+
+def test_one_huge_message_is_clipped_not_dropped(tmp_path: Path) -> None:
+    """A single 200 KB tool call must not swallow the whole budget."""
+    builder = _builder(tmp_path)
+    from app.context import SessionManager
+    from app.config import AppPaths
+    from app.storage import StateStore
+
+    paths = AppPaths(
+        project_root=tmp_path,
+        state_dir=tmp_path,
+        project_state_file=tmp_path / "project_state.json",
+        memory_file=tmp_path / "memory.json",
+    )
+    store = StateStore(paths)
+    sessions = SessionManager(tmp_path / "sessions", store=store)
+    builder = ContextBuilder(sessions.transcript, sessions.memory, sessions.store)
+    session_id = sessions.start().active_session_id
+    sessions.record("assistant", "y" * 200_000)
+    sessions.record("user", "still here")
+
+    text = builder.transcript_text(session_id)
+
+    assert "y" * 200_000 not in text, "the giant message was not clipped"
+    assert "still here" in text, "clipping one message must not lose the others"
+    assert len(text) < 12_000, len(text)

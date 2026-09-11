@@ -891,6 +891,37 @@ A person asking a second question types into the thread they are already in, so
 * `open(new_conversation=True)` (CLI: `--new-conversation`) is the explicit
   fresh start.
 
+## Never send into an answer that is still being written (M14)
+
+The page's own truth beats a text heuristic. While a web LLM writes an answer it
+keeps a request open, so that in-flight request is what tells us the model is
+still working:
+
+```jsonc
+"generating_patterns": ["/api/v0/chat/completion"]   // in-flight here = still generating
+```
+
+Text stability alone is not enough, and getting this wrong is not cosmetic: an
+answer that merely PAUSES (a model thinking before it writes, a long block not
+rendered yet) has a stable text length, so the old detector declared it finished,
+the agent sent the next prompt, and the site replaced the answer in flight. What
+came back was half a tool call - which is exactly the truncated JSON the parser
+then rejected, and the run ended with the project half-edited.
+
+The live check measured the window: of 22 samples taken while one answer was
+being written, **13 showed no visible change while the page was still working**.
+
+So:
+
+* `is_generating()` = an in-flight completion request, or the stop control when
+  a profile names one. Text stability is never used for this decision;
+* `wait_until_complete()` refuses to call an answer finished while the page is
+  still working, however stable its text looks;
+* `send()` waits for the page to settle first, and if it never settles it
+  **raises instead of typing** - an interrupted answer is worse than a late one.
+
+`tests/manual/live_interrupt_check.py` proves all three against the real site.
+
 ## A switch that must be ON
 
 A profile can declare switches that are turned on before every message:

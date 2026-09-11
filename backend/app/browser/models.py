@@ -39,6 +39,11 @@ class CompletionPolicy(BaseModel):
     poll_interval_ms: int = Field(default=250, gt=0)
     stable_polls: int = Field(default=3, ge=1)
     min_wait_ms: int = Field(default=300, ge=0)
+    # How long send() waits for a page that is STILL generating before it gives
+    # up. Sending a question into a generating page stops that answer, so the
+    # provider waits instead of interrupting; if the page never settles, it
+    # raises rather than corrupting the answer in flight.
+    idle_timeout_ms: int = Field(default=180_000, gt=0)
 
 
 class HumanPolicy(BaseModel):
@@ -168,6 +173,12 @@ class ProviderProfile(BaseModel):
 
     network_response_patterns: list[str] = Field(default_factory=list)
     network_text_path: str = "delta"
+    # URLs whose IN-FLIGHT request means "the page is still generating". This is
+    # the page's own truth and it is checked in addition to the text-stability
+    # heuristic: a model that is thinking, or a long block that has not been
+    # rendered yet, shows no text change while it is still working, and a
+    # question sent in that window interrupts the answer (M14).
+    generating_patterns: list[str] = Field(default_factory=list)
     network_content_types: list[str] = Field(
         default_factory=lambda: ["text/event-stream", "application/json"]
     )

@@ -183,6 +183,39 @@ class WebChatProvider(ProviderAdapter):
             f"sign in manually in the headed window until '{signal}' is visible"
         )
 
+    # -- "is the page still working?" --------------------------------------
+
+    def is_generating(self) -> bool:
+        """Whether the page is still producing an answer right now.
+
+        Two independent signals, because either one alone is wrong:
+
+        * an in-flight request to the site's completion endpoint - the page's
+          own truth, and the only signal that survives a long pause with no
+          visible change (the model thinking, or a block not rendered yet);
+        * the stop/generating control being visible, when the profile names one.
+
+        Text stability is NOT used here: it is what made the console send the
+        next question into an answer that had merely paused, which stops that
+        answer on the site (M14).
+        """
+        if self.profile.generating_patterns:
+            if self.driver.inflight(self.profile.generating_patterns):
+                return True
+        return bool(self.driver.is_visible(self.profile.stop_button_selector))
+
+    def wait_for_idle(self, timeout_ms: int | None = None) -> bool:
+        """Wait until the page is not generating. False when it never settles."""
+        budget = self.profile.completion.idle_timeout_ms if timeout_ms is None else timeout_ms
+        started = time.monotonic()
+        deadline = started + budget / 1000
+        while True:
+            if not self.is_generating():
+                return True
+            if time.monotonic() >= deadline:
+                return False
+            self.driver.wait(self.profile.completion.poll_interval_ms)
+
     def send(self, prompt: str) -> None:
         text = (prompt or "").strip()
         if not text:
@@ -190,6 +223,17 @@ class WebChatProvider(ProviderAdapter):
         if not self.is_logged_in():
             raise LoginRequiredError(
                 f"profile '{self.name}' is not logged in; log in manually first"
+            )
+        # Never type into a page that is still answering: on this site the new
+        # message REPLACES the answer in flight, so the previous reply is lost
+        # halfway through (and a half-written tool call is what the parser then
+        # rejects). Wait for the page to settle, and refuse rather than
+        # interrupt when it never does.
+        if not self.wait_for_idle():
+            raise ProviderError(
+                "the page is still generating after "
+                + str(self.profile.completion.idle_timeout_ms)
+                + " ms; refusing to send a new message and interrupt it"
             )
         page = self.driver.page
         self._capture_since = self.driver.network_cursor()
@@ -261,12 +305,14 @@ class WebChatProvider(ProviderAdapter):
                 on_delta(text, True)
                 emitted = text
 
-        # Phase 1: wait until the page visibly starts generating.
+        # Phase 1: wait until the page visibly starts generating. With thinking
+        # mode the answer can stay empty for many seconds while the model
+        # reasons, so the in-flight request counts as "started" too.
         while time.monotonic() < start_deadline:
             stop_visible = self._stop_visible()
             text = self._dom_text()
             report(text)
-            if stop_visible or len(text) > 0:
+            if stop_visible or len(text) > 0 or self.is_generating():
                 generation_started = True
                 stop_seen = stop_seen or stop_visible
                 signals.append("generation_started")
@@ -304,9 +350,19 @@ class WebChatProvider(ProviderAdapter):
 
             elapsed_ms = int((time.monotonic() - start) * 1000)
             if stable >= policy.stable_polls and elapsed_ms >= policy.min_wait_ms:
+                if self.is_generating():
+                    # The text stopped changing but the page is still working:
+                    # a paused answer, not a finished one. Capturing here is what
+                    # produced truncated tool calls (M14).
+                    if "still_generating" not in signals:
+                        signals.append("still_generating")
+                    stable = 0
+                    self.driver.wait(policy.poll_interval_ms)
+                    continue
                 signals.append("stop_button_gone")
                 signals.append("dom_stable")
                 signals.append("text_length_stable")
+                signals.append("request_finished")
                 return self._timeline(
                     started_at,
                     completed=True,
@@ -323,6 +379,9 @@ class WebChatProvider(ProviderAdapter):
             self.driver.wait(policy.poll_interval_ms)
 
         signals.append("timeout_fallback")
+        still_working = self.is_generating()
+        if still_working:
+            signals.append("still_generating")
         return self._timeline(
             started_at,
             completed=False,
@@ -333,7 +392,11 @@ class WebChatProvider(ProviderAdapter):
             stop_seen=stop_seen,
             text_length=max(last_len, 0),
             signals=signals,
-            note=f"no completion within {budget} ms; returning partial text",
+            note=(
+                f"no completion within {budget} ms"
+                + ("; the page is STILL generating, the text is partial"
+                   if still_working else "; returning partial text")
+            ),
         )
 
     def capture_response(self) -> CapturedText:
